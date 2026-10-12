@@ -2,5 +2,18 @@
   "version": 2,
   "framework": null,
   "buildCommand": null,
-  "outputDirectory": "public"
+  "outputDirectory": "public",
+  "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/Processia.html",
+      "destination": "/atelier",
+      "permanent": true
+    },
+    {
+      "source": "/Processia",
+      "destination": "/atelier",
+      "permanent": true
+    }
+  ]
 }
