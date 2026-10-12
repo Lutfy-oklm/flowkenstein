@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Processia — Création de diagrammes BPMN</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIiB2aWV3Qm94PSIwIDAgMTIwIDEyMCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsbGVkYnk9InRpdGxlIj4KIDx0aXRsZSBpZD0idGl0bGUiPlByb2Nlc3NpYTwvdGl0bGU+CiA8ZyBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPgogIDxwYXRoIGQ9Ik0yOSA2MGgxOU03NiA2MGgyMCIgc3Ryb2tlPSIjMTQyZjQ5IiBzdHJva2Utd2lkdGg9IjUiLz4KICA8Y2lyY2xlIGN4PSIxOSIgY3k9IjYwIiByPSIxMCIgc3Ryb2tlPSIjMDA4NjhkIiBzdHJva2Utd2lkdGg9IjUiLz4KICA8cmVjdCB4PSI0OCIgeT0iNDMiIHdpZHRoPSIyOCIgaGVpZ2h0PSIzNCIgcng9IjciIGZpbGw9IiMwMDg2OGQiLz4KICA8cGF0aCBkPSJtMTA1IDQ4IDEyIDEyLTEyIDEyLTEyLTEyWiIgZmlsbD0iI2ZmZjhlZCIgc3Ryb2tlPSIjYmM2YjE4IiBzdHJva2Utd2lkdGg9IjQiLz4KICA8cGF0aCBkPSJNNjIgNzd2MTRoNDNWNzIiIHN0cm9rZT0iIzAwODY4ZCIgc3Ryb2tlLXdpZHRoPSI0Ii8+CiA8L2c+Cgo8L3N2Zz4K">
+<!--LIBRARY_STYLES-->
+<style>
+:root{--ink:#263246;--accent:#5755c9;--border:#e3e5ed}*{box-sizing:border-box}html,body{height:100%;margin:0;overflow:hidden;font:13px Arial,sans-serif;color:var(--ink)}button,input,textarea{font:inherit}button{cursor:pointer;border:1px solid transparent;border-radius:7px;background:white;color:var(--ink);padding:9px 11px}button:hover{background:#f1f0ff;border-color:#dedcf9}button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}button:disabled{opacity:.4;cursor:default}button.active,button.primary{color:white;background:var(--accent)}#canvas{position:absolute;inset:0;background-color:#fafbfc;background-image:radial-gradient(#dce0e7 1px,transparent 1px);background-size:20px 20px}.topbar{position:absolute;top:16px;left:16px;right:16px;display:flex;gap:12px;align-items:flex-start;pointer-events:none;z-index:10}.panel{pointer-events:auto;background:white;border:1px solid var(--border);border-radius:12px;padding:7px;box-shadow:0 3px 16px #2632460a;display:flex;align-items:center;gap:3px}.brand{font-size:15px;font-weight:bold;padding:0 13px 0 7px;white-space:nowrap}.brand span{color:var(--accent);font-size:22px;margin-right:6px}.divider{height:25px;border-left:1px solid var(--border);margin:0 6px}.top-right{margin-left:auto}.name{width:210px;border:0;font-weight:600;padding:8px;border-radius:5px;background:transparent;color:var(--ink)}.name:focus{outline:2px solid #dedcf9}.djs-palette{top:96px!important;left:16px!important;border:1px solid var(--border)!important;border-radius:12px!important;background:white!important;box-shadow:0 3px 16px #2632460a!important}.djs-palette .entry{color:var(--ink)!important}.djs-palette .entry:hover{color:var(--accent)!important;background:#f1f0ff}.djs-context-pad .entry{border-radius:5px!important}.bottom-left{position:absolute;left:16px;bottom:18px;z-index:10}.bottom-right{position:absolute;right:26px;bottom:80px;z-index:10}.hint{position:absolute;bottom:25px;left:50%;transform:translateX(-50%);pointer-events:none;color:#8590a0;font-size:12px;white-space:nowrap}#zoom{min-width:55px;text-align:center;font-size:12px}.saved{padding:0 10px;font-size:11px;color:#8590a0;white-space:nowrap}#properties{position:absolute;right:16px;top:90px;width:260px;background:white;border:1px solid var(--border);border-radius:12px;padding:19px;box-shadow:0 3px 16px #2632460a;z-index:10;display:none}.property-head{display:flex;justify-content:space-between;align-items:center;font-weight:bold;margin-bottom:15px}.property-head button{font-size:20px;padding:0 5px}.type{font-size:10px;color:#8590a0;margin-bottom:17px}label{display:block;font-size:11px;font-weight:bold;margin:15px 0 7px}textarea{width:100%;border:1px solid #dce0e7;border-radius:6px;padding:10px;color:var(--ink);resize:vertical;line-height:1.5}textarea:focus{outline:2px solid #dedcf9}#properties .primary{width:100%;margin-top:14px}.empty-property{color:#8590a0;font-size:12px;line-height:1.7}#toast{position:absolute;left:50%;bottom:80px;transform:translateX(-50%);background:var(--ink);color:white;border-radius:8px;padding:12px 18px;display:none;z-index:50;max-width:85vw;line-height:1.5}dialog{border:1px solid var(--border);border-radius:14px;padding:25px;width:470px;max-width:90vw;color:var(--ink);box-shadow:0 10px 80px #26324630}dialog::backdrop{background:#26324650}dialog h2{font-size:19px;margin-top:0}dialog p{font-size:13px;line-height:1.8;color:#6b778a}dialog .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}.bjs-powered-by{z-index:12!important}@media(max-width:1000px){.saved{display:none}.hint{display:none}.name{width:150px}.brand{padding-right:5px}}@media(max-width:720px){.topbar{flex-wrap:wrap;gap:7px;left:10px;top:10px;right:10px}.top-right{margin-left:0}.name{width:145px}.djs-palette{top:130px!important;left:10px!important}#properties{top:130px;width:220px}.panel{padding:5px}button{padding:8px}.brand{font-size:13px}}
+</style><style>
+:root{--ink:#142f49;--accent:#00868d;--border:#dce5ed}
+#canvas{background-color:#f6f8fb;background-image:radial-gradient(#dce5ed 1px,transparent 1px)}
+button:hover{background:#eaf5f5;border-color:#b8dedd}
+.name:focus,textarea:focus{outline-color:#b8dedd}
+.djs-palette .entry:hover{color:#00868d!important;background:#eaf5f5}
+.panel,.djs-palette,#properties{border-color:#dce5ed}
+.djs-label{font-family:Arial,sans-serif!important;fill:#142f49!important}
+.djs-direct-editing-content{color:#142f49!important;font-family:Arial,sans-serif!important}
+.djs-palette{display:none!important}
+.topbar{align-items:center;gap:12px}.topbar .menu-toggle{width:46px;height:46px;font-size:24px;padding:0;background:#eaf0f6;border:1px solid transparent;pointer-events:auto;border-radius:12px}.top-right{margin-left:auto}.top-right .name{width:170px}.top-right .saved{display:none}
+.drawing-tools{position:absolute;top:0;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:3px;padding:6px;border:1px solid #dce5ed;background:#fff;border-radius:13px;box-shadow:0 3px 16px #142f490a;pointer-events:auto}.drawing-tools button,.extra-tools button{width:41px;height:41px;padding:7px;border-radius:9px;font-size:23px;display:flex;align-items:center;justify-content:center}.drawing-tools button.active,.extra-tools button.active{background:#d7eeee;color:#006e74;border-color:#b7dddd}.drawing-tools .divider{height:27px;margin:0 4px}.drawing-tools svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.7}
+.file-menu{position:absolute;top:74px;left:16px;width:320px;max-width:calc(100vw - 32px);padding:9px;background:white;border:1px solid #dce5ed;border-radius:13px;box-shadow:0 8px 32px #142f4915;z-index:30}.file-menu[hidden],.extra-tools[hidden]{display:none}.file-menu button{display:flex;align-items:center;width:100%;gap:13px;padding:13px 12px;text-align:left;border-radius:8px;font-size:14px}.file-menu .menu-icon{font-size:21px;width:25px;text-align:center}.file-menu kbd{margin-left:auto;font:11px Arial,sans-serif;color:#8b96a4;white-space:nowrap}.file-menu .menu-heading{padding:10px 13px 14px;font-size:11px;font-weight:bold;letter-spacing:1px;color:#5d7288;border-bottom:1px solid #e8edf2;margin-bottom:6px}.file-menu .menu-rule{border-top:1px solid #e8edf2;margin:7px 4px}.extra-tools{position:absolute;top:79px;left:50%;transform:translateX(-50%);display:grid;grid-template-columns:repeat(4,48px);gap:6px;padding:12px;border:1px solid #dce5ed;border-radius:12px;background:white;box-shadow:0 8px 32px #142f4915;z-index:25}.export-label{margin:14px 0 6px}.export-input{font:inherit;width:100%;padding:11px;border:1px solid #dce5ed;border-radius:6px;color:#142f49}.export-row{display:flex;gap:12px}.export-row>div{flex:1}#properties{max-height:calc(100vh - 120px);overflow-y:auto}
+@media(max-width:1120px){.top-right .name{width:125px}.drawing-tools button{width:35px;height:39px;font-size:21px}.drawing-tools{gap:1px}.top-right{padding:5px}.top-right button{font-size:11px;padding:8px}}
+@media(max-width:850px){.topbar{flex-wrap:nowrap}.drawing-tools{top:61px;width:max-content;max-width:calc(100vw - 24px)}.top-right .name{width:170px}.extra-tools{top:132px}.file-menu{top:70px}#properties{top:130px;max-height:calc(100vh - 160px)}}
+@media(max-width:450px){.top-right .name{width:125px}.drawing-tools button{width:31px;height:36px;font-size:19px}.drawing-tools .divider{margin:0 2px}.top-right button{font-size:10px}}
+.top-right .name,#properties,#props-button,.bottom-right,#fit,#magnetism{display:none!important}
+.bottom-left{display:flex;gap:12px;background:none;border:0;box-shadow:none;padding:0;align-items:center}
+.zoom-controls,.history-controls{display:flex;align-items:center;gap:6px;padding:7px 9px;background:#e9edf4;border-radius:12px;pointer-events:auto}
+.zoom-controls button,.history-controls button{background:transparent;width:40px;height:40px;padding:7px;font-size:22px;border-radius:8px}
+.zoom-controls button:hover,.history-controls button:hover{background:#dce5ed}
+.zoom-controls #zoom{font-size:15px;min-width:58px}.history-controls{gap:3px}
+/* Compact controls with an unframed add-lane button. */
+.topbar{top:12px;left:12px;right:12px}
+.topbar .top-right{background:transparent;border:0;box-shadow:none;padding:0;border-radius:0}
+#add-lane{height:36px;padding:0 12px;border-radius:8px;font-size:12px;font-weight:600}
+.topbar .menu-toggle{width:38px;height:38px;font-size:20px;border-radius:10px}
+.drawing-tools{padding:5px;gap:2px;border-radius:11px}
+.drawing-tools button,.extra-tools button{width:34px;height:34px;font-size:20px;padding:5px;border-radius:7px}
+.drawing-tools svg{width:20px;height:20px}.drawing-tools .divider{height:22px;margin:0 3px}
+.file-menu{top:60px;left:12px;width:250px;padding:7px;border-radius:11px}
+.file-menu button{padding:11px 10px;font-size:13px;gap:10px}.file-menu .menu-icon{font-size:18px;width:22px}
+.file-menu .menu-heading{font-size:10px;padding:9px 11px 12px}.file-menu kbd{font-size:10px}
+.extra-tools{top:65px;grid-template-columns:repeat(4,39px);gap:5px;padding:9px;border-radius:10px}
+.bottom-left{left:12px;bottom:12px;gap:10px}
+.zoom-controls,.history-controls{padding:4px 6px;gap:4px;border-radius:10px}
+.zoom-controls button,.history-controls button{width:32px;height:32px;padding:5px;font-size:19px;border-radius:6px}
+.zoom-controls #zoom{font-size:13px;min-width:48px}.history-controls{gap:2px}
+.hint{font-size:11px;bottom:22px}
+@media(max-width:850px){.drawing-tools{top:48px}.extra-tools{top:110px}.file-menu{top:59px}}
+@media(max-width:450px){.drawing-tools button{width:29px;height:32px;font-size:18px}.drawing-tools svg{width:18px;height:18px}#add-lane{font-size:11px;height:34px;padding:0 10px}}
+
+.processia-brand{height:38px;display:flex;align-items:center;pointer-events:none}.processia-brand img{display:block;width:125px;height:30px}@media(max-width:600px){.processia-brand img{width:105px;height:26px}}
+
+.file-menu{width:250px}.file-menu button{gap:9px;padding:10px 8px;font-size:12px}.file-menu kbd{font-size:9px}.file-menu .menu-icon{width:20px;font-size:18px}
+</style></head><body>
+<div id="canvas" aria-label="Zone de dessin BPMN"></div>
+<div class="topbar"><button id="menu-toggle" class="menu-toggle" aria-label="Menu fichier" aria-expanded="false" aria-controls="file-menu">☰</button><div id="drawing-tools" class="drawing-tools" role="toolbar" aria-label="Outils de dessin BPMN"><button id="select-tool" class="active" title="Sélection (V)" aria-label="Sélection"><svg viewBox="0 0 24 24"><path d="M5 3l14 10-7 1-3 7z" fill="currentColor" stroke="none"/></svg></button><span class="divider"></span></div><div class="panel top-right"><input id="title" class="name" aria-label="Nom du diagramme" value="Mon processus" maxlength="150"><span id="saved" class="saved">Sur cet appareil</span><button id="add-lane" class="primary" title="Ajouter un couloir sous le dernier acteur">＋ Couloir</button></div></div>
+<nav id="file-menu" class="file-menu" aria-label="Menu fichier" hidden><button id="open"><span class="menu-icon">▱</span>Ouvrir<kbd>Ctrl+O</kbd></button><button id="export"><span class="menu-icon">↓</span>Enregistrer sous…<kbd>Ctrl+Maj+S</kbd></button><button id="svg"><span class="menu-icon">▧</span>Exporter l’image…<kbd>Ctrl+Maj+E</kbd></button><div class="menu-rule"></div><button id="help"><span class="menu-icon">ⓘ</span>Aide<kbd>?</kbd></button><button id="new"><span class="menu-icon">＋</span>Nouveau diagramme</button></nav>
+<div id="extra-tools" class="extra-tools" role="toolbar" aria-label="Autres outils BPMN" hidden></div>
+<div class="bottom-left"><div class="zoom-controls"><button id="minus" aria-label="Dézoomer">−</button><span id="zoom">100 %</span><button id="plus" aria-label="Zoomer">＋</button></div><div class="history-controls"><button id="undo" title="Annuler" aria-label="Annuler">↶</button><button id="redo" title="Rétablir" aria-label="Rétablir">↷</button></div><div hidden><button id="fit">Centrer</button><button id="magnetism" aria-pressed="false">Aimantation : non</button></div></div>
+<div class="panel bottom-right"><button id="props-button">Propriétés</button></div>
+<div class="hint">Choisissez une forme en haut, puis placez-la sur le tableau · Double-cliquez pour écrire</div>
+<aside id="properties"><div class="property-head">Propriétés <button id="close-props" aria-label="Fermer">×</button></div><div id="property-empty" class="empty-property">Sélectionnez une forme ou une connexion sur le diagramme.</div><div id="property-fields" hidden><div id="type" class="type"></div><label for="label">Libellé</label><textarea id="label" rows="3"></textarea><label for="description">Description</label><textarea id="description" rows="4"></textarea><div id="size-fields" hidden><label>Taille de l’élément</label><div style="display:flex;gap:10px"><label style="flex:1;margin:0">Largeur<input id="shape-width" type="number" min="32" max="2000" step="1" style="width:100%;padding:8px;border:1px solid #dce5ed;border-radius:5px;margin-top:5px"></label><label style="flex:1;margin:0">Hauteur<input id="shape-height" type="number" min="32" max="2000" step="1" style="width:100%;padding:8px;border:1px solid #dce5ed;border-radius:5px;margin-top:5px"></label></div><div style="display:flex;gap:8px;margin-top:10px"><button id="smaller-shape" style="flex:1" title="Réduire la forme de 10 %">− Taille</button><button id="larger-shape" style="flex:1" title="Agrandir la forme de 10 %">＋ Taille</button></div><p style="font-size:11px;color:#8590a0;line-height:1.5">Les tâches se redimensionnent aussi avec les poignées de leurs coins.</p></div><button id="apply" class="primary">Appliquer</button></div></aside>
+<input id="file" type="file" accept=".bpmn,.xml" hidden><div id="toast" role="status" aria-live="polite"></div>
+<dialog id="new-dialog"><h2>Nouveau diagramme</h2><p>Exportez le diagramme actuel si vous souhaitez le conserver. Vous pourrez le rouvrir à tout moment.</p><div class="actions"><button id="cancel-new">Annuler</button><button id="confirm-new" class="primary">Créer</button></div></dialog>
+<dialog id="actor-dialog"><form id="actor-form"><h2 id="actor-title">Nom de l’acteur</h2><input id="actor-name" maxlength="150" style="width:100%;padding:12px;border:1px solid #dce5ed;border-radius:6px;font:inherit" aria-label="Nom"><div class="actions"><button id="cancel-actor" type="button">Annuler</button><button type="submit" class="primary">Appliquer</button></div></form></dialog>
+<dialog id="save-dialog"><form id="save-form"><h2>Enregistrer sous…</h2><label class="export-label" for="save-name">Nom du diagramme</label><input id="save-name" class="export-input" required maxlength="150"><p>Le fichier BPMN conserve les éléments, les connexions, les dimensions et les couleurs. Utilisez « Ouvrir » pour le reprendre.</p><div class="actions"><button type="button" id="cancel-save">Annuler</button><button type="submit" class="primary">Enregistrer</button></div></form></dialog>
+<dialog id="image-dialog"><form id="image-form"><h2>Exporter l’image</h2><label class="export-label" for="image-name">Nom du fichier</label><input id="image-name" class="export-input" required maxlength="150"><div class="export-row"><div><label class="export-label" for="image-format">Format</label><select id="image-format" class="export-input"><option value="png">PNG · Image</option><option value="svg">SVG · Vectoriel</option></select></div><div><label class="export-label" for="image-background">Fond</label><select id="image-background" class="export-input"><option value="white">Blanc</option><option value="transparent">Transparent</option></select></div></div><p>Le diagramme complet est exporté, sans les menus ni la palette.</p><div class="actions"><button type="button" id="cancel-image">Annuler</button><button id="image-submit" type="submit" class="primary">Exporter</button></div></form></dialog>
+<dialog id="help-dialog"><h2>Processia · Votre tableau BPMN 2.0</h2><p>Choisissez une forme dans la palette horizontale du haut, puis placez-la sur le tableau. Le bouton ⋮ affiche les autres éléments BPMN.</p><p>Cliquez sur une forme : la flèche permet de la relier, la clé de changer son type, la poubelle de la supprimer. Le bouton + Couloir ajoute un acteur.</p><p>Double-cliquez pour écrire. Déplacez les formes librement. Utilisez Propriétés pour ajouter une description ou modifier leur taille.</p><p>Le dessin s’enregistre dans ce navigateur. Dans le menu ☰, Enregistrer sous… conserve un fichier BPMN réutilisable ; Exporter l’image… propose PNG et SVG.</p><div class="actions"><button id="close-help" class="primary">Dessiner</button></div></dialog>
+<!--LIBRARY_SCRIPT-->
+<script>
+'use strict';
+const $=id=>document.getElementById(id), KEY='bpmn-whiteboard-v1';
+// Apply the supplied PDF's palette without introducing extra undo commands.
+function PdfDesign(eventBus,bpmnRenderer){
+ const navy='#142f49',teal='#00868d',orange='#bc6b18';
+ function colors(element){
+  const el=element.labelTarget||element,type=el.type;
+  if(type.includes('Gateway'))return{stroke:orange,fill:'#fff8ed'};
+  if(type==='bpmn:EndEvent')return{stroke:navy,fill:'#ffffff'};
+  if(type==='bpmn:Lane'){
+   const lanes=(el.parent?.children||[]).filter(s=>s.type==='bpmn:Lane').sort((a,b)=>a.y-b.y);
+   let index=lanes.indexOf(el);
+   if(index<0)index=(el.businessObject.$parent?.lanes||[]).indexOf(el.businessObject);
+   return{stroke:'#dce5ed',fill:index%2===1?'#e3ecf6':'#ffffff'};
+  }
+  if(type==='bpmn:Participant')return el.businessObject.processRef?{stroke:'#dce5ed',fill:'#ffffff'}:{stroke:teal,fill:'#eaf5f5'};
+  if(type==='bpmn:SequenceFlow'||type==='bpmn:Association')return{stroke:navy,fill:'#ffffff'};
+  if(type==='bpmn:MessageFlow')return{stroke:teal,fill:'#ffffff'};
+  return{stroke:teal,fill:'#ffffff'};
+ }
+ function remember(el,palette){
+  const di=(el.labelTarget||el).di;if(!di)return;
+  di.set('bioc:stroke',palette.stroke);di.set('bioc:fill',palette.fill);
+  di.set('color:border-color',palette.stroke);di.set('color:background-color',palette.fill);
+  if(di.label)di.label.set('color:color',navy);
+ }
+ eventBus.on(['render.shape','render.connection'],2000,(event,context)=>{
+  const el=context.element;if(!bpmnRenderer.canRender(el))return;
+  const palette=colors(el);remember(el,palette);
+  const attrs={...context.attrs,...palette};
+  const shape=event.type==='render.connection'?bpmnRenderer.drawConnection(context.gfx,el,attrs):bpmnRenderer.drawShape(context.gfx,el,attrs);
+  context.gfx.querySelectorAll('text').forEach(text=>{text.setAttribute('fill',navy);text.style.fill=navy;});
+  if(el.type==='bpmn:Lane'&&shape){
+   shape.setAttribute('fill-opacity','1');
+   shape.setAttribute('fill',palette.fill);shape.style.fill=palette.fill;
+   context.gfx.querySelectorAll('text').forEach(text=>text.remove());
+   const ns='http://www.w3.org/2000/svg',columnWidth=Math.min(160,el.width),panel=document.createElementNS(ns,'rect');
+   Object.entries({x:0,y:0,width:columnWidth,height:el.height,fill:'#e6edf4',stroke:'#dce5ed','stroke-width':1}).forEach(([key,value])=>panel.setAttribute(key,value));
+   context.gfx.append(panel);
+   const lines=[];String(el.businessObject.name||'Acteur').split('\n').forEach(paragraph=>{let line='';paragraph.split(/\s+/).filter(Boolean).forEach(word=>{if((line+' '+word).trim().length>17&&line){lines.push(line);line=word;}else line=(line+' '+word).trim();});if(line)lines.push(line);});
+   const text=document.createElementNS(ns,'text'),fontSize=15,lineHeight=21;
+   Object.entries({x:columnWidth/2,y:el.height/2-(lines.length-1)*lineHeight/2+5,fill:navy,'font-family':'Arial, sans-serif','font-size':fontSize,'font-weight':'700','text-anchor':'middle','pointer-events':'none'}).forEach(([key,value])=>text.setAttribute(key,value));
+   lines.forEach((line,index)=>{const span=document.createElementNS(ns,'tspan');span.setAttribute('x',String(columnWidth/2));span.setAttribute('dy',index?'21':'0');span.textContent=line;text.append(span);});context.gfx.append(text);
+  }
+  if(el.type==='bpmn:Participant'&&el.businessObject.processRef){
+   context.gfx.querySelectorAll('text').forEach(text=>text.remove());
+   // Hide the pool's reserved header without moving nodes or their connectors.
+   const separator=shape?.nextElementSibling;
+   if(separator&&['path','polyline','line'].includes(separator.tagName.toLowerCase()))separator.remove();
+   const lanes=(el.children||[]).filter(child=>child.type==='bpmn:Lane');
+   const inset=lanes.length?Math.max(0,Math.min(...lanes.map(lane=>lane.x))-el.x):30;
+   if(shape){shape.setAttribute('x',String(inset));shape.setAttribute('width',String(Math.max(0,el.width-inset)));}
+  }
+  if(el.type==='bpmn:StartEvent'&&shape)shape.setAttribute('stroke-width','2');
+  return shape;
+ });
+}
+PdfDesign.$inject=['eventBus','bpmnRenderer'];
+const frenchLabels={
+ 'Task':'Tâche','User task':'Tâche utilisateur','Service task':'Tâche de service','Send task':'Tâche d’envoi','Receive task':'Tâche de réception','Manual task':'Tâche manuelle','Business rule task':'Tâche de règle métier','Script task':'Tâche de script','Call activity':'Activité d’appel','Compensation activity':'Activité de compensation',
+ 'Gateway':'Passerelle','Exclusive gateway':'Passerelle exclusive','Parallel gateway':'Passerelle parallèle','Inclusive gateway':'Passerelle inclusive','Complex gateway':'Passerelle complexe','Event-based gateway':'Passerelle événementielle',
+ 'Sub-process':'Sous-processus','Expanded sub-process':'Sous-processus développé','Event sub-process':'Sous-processus événementiel','Ad-hoc sub-process':'Sous-processus ad hoc','Transaction':'Transaction',
+ 'Data object reference':'Document / données','Data store reference':'Stockage de données','Group':'Groupe','Pool/participant':'Participant / organisation','Expanded pool/participant':'Participant développé','Text annotation':'Annotation de texte','Intermediate/boundary event':'Événement intermédiaire / de bordure',
+ 'Sequence flow':'Flux de séquence','Default flow':'Flux par défaut','Conditional flow':'Flux conditionnel',
+ 'Delete':'Supprimer','Change element':'Changer le type d’élément','Add lane above':'Ajouter un couloir au-dessus','Add lane below':'Ajouter un couloir en dessous','Divide into two lanes':'Diviser en deux couloirs','Divide into three lanes':'Diviser en trois couloirs','Add text annotation':'Ajouter une annotation de texte',
+ 'Connect to other element':'Relier à un autre élément','Connect using association':'Relier par une association','Connect using data input association':'Relier par une association de données',
+ 'Parallel multi-instance':'Instances multiples parallèles','Sequential multi-instance':'Instances multiples séquentielles','Loop':'Boucle','Collection':'Collection','Participant multiplicity':'Multiplicité du participant','Toggle non-interrupting':'Basculer en mode non interruptif',
+ 'Activate hand tool':'Activer l’outil main','Activate lasso tool':'Activer le lasso','Activate create/remove space tool':'Ajouter ou retirer de l’espace','Activate global connect tool':'Activer l’outil de connexion',
+ 'Align elements':'Aligner les éléments','Align elements left':'Aligner à gauche','Align elements right':'Aligner à droite','Align elements center':'Centrer horizontalement','Align elements middle':'Centrer verticalement','Align elements top':'Aligner en haut','Align elements bottom':'Aligner en bas','Distribute elements horizontally':'Répartir horizontalement','Distribute elements vertically':'Répartir verticalement',
+ 'Search':'Rechercher','Search in diagram':'Rechercher dans le diagramme','Search for an element':'Rechercher un élément','Search for a type':'Rechercher un type','No results found':'Aucun résultat','No entries found':'Aucun élément trouvé','Open {element}':'Ouvrir {element}'
+};
+function frenchTranslate(template,replacements={}){
+ function label(value){
+  if(frenchLabels[value])return frenchLabels[value];
+  const suffix=value.match(/ \((collapsed|expanded|non-interrupting)\)$/);
+  if(suffix)return label(value.slice(0,-suffix[0].length))+' ('+({collapsed:'réduit',expanded:'développé','non-interrupting':'non interruptif'})[suffix[1]]+')';
+  const action=value.match(/^(Create|Append) (.+)$/);
+  if(action)return (action[1]==='Create'?'Créer : ':'Ajouter : ')+label(action[2][0].toUpperCase()+action[2].slice(1));
+  const event=value.match(/^(?:(Message|Timer|Conditional|Signal|Escalation|Link|Compensation|Error|Cancel|Terminate) )?(start event|end event|intermediate catch event|intermediate throw event|boundary event)$/i);
+  if(event){const types={'start event':'Événement de début','end event':'Événement de fin','intermediate catch event':'Événement intermédiaire de réception','intermediate throw event':'Événement intermédiaire d’émission','boundary event':'Événement de bordure'},triggers={message:'message',timer:'temporisation',conditional:'condition',signal:'signal',escalation:'escalade',link:'lien',compensation:'compensation',error:'erreur',cancel:'annulation',terminate:'terminaison'};return types[event[2].toLowerCase()]+(event[1]?' — '+triggers[event[1].toLowerCase()]:'');}
+  return value;
+ }
+ return label(template).replace(/\{([^}]+)\}/g,(match,key)=>replacements[key]===undefined?match:String(replacements[key]));
+}
+const editor=new BpmnJS({container:'#canvas',additionalModules:[{translate:['value',frenchTranslate]},{__init__:['pdfDesign'],pdfDesign:['type',PdfDesign]}],bpmnRenderer:{defaultFillColor:'#ffffff',defaultStrokeColor:'#00868d',defaultLabelColor:'#142f49'},gridSnapping:{active:false},canvas:{deferUpdate:true},textRenderer:{defaultStyle:{fontFamily:'Arial, sans-serif',fontSize:12},externalStyle:{fontFamily:'Arial, sans-serif',fontSize:12}}});
+function closeFileMenu(){$('file-menu').hidden=true;$('menu-toggle').setAttribute('aria-expanded','false');}
+$('menu-toggle').onclick=()=>{const open=$('file-menu').hidden;$('file-menu').hidden=!open;$('menu-toggle').setAttribute('aria-expanded',String(open));$('extra-tools').hidden=true;};
+$('file-menu').addEventListener('click',event=>{if(event.target.closest('button'))closeFileMenu();});
+document.addEventListener('pointerdown',event=>{if(!event.target.closest('#file-menu,#menu-toggle'))closeFileMenu();if(!event.target.closest('#extra-tools,#more-tools'))$('extra-tools').hidden=true;});
+function selectPointer(){editor.get('dragging').cancel();editor.get('toolManager').setActive(null);highlightTool('select-tool');}
+function highlightTool(id){document.querySelectorAll('.drawing-tools button,.extra-tools button').forEach(button=>button.classList.toggle('active',button.id===id));}
+$('select-tool').onclick=selectPointer;
+const toolLabels={
+ 'hand-tool':'Déplacer le tableau (H)','lasso-tool':'Sélection multiple','space-tool':'Ajouter ou retirer de l’espace','global-connect-tool':'Relier les éléments (A)',
+ 'create.task':'Tâche (T)','create.exclusive-gateway':'Décision (D)','create.start-event':'Événement de début (C)','create.end-event':'Événement de fin (F)',
+ 'create.intermediate-event':'Événement intermédiaire','create.subprocess-expanded':'Sous-processus','create.participant-expanded':'Participant / organisation','create.data-object':'Document / données','create.data-store':'Stockage de données','create.group':'Groupe'
+};
+function paletteButton(action,parent){
+ const entry=editor.get('palette').getEntries()[action];if(!entry)return;
+ const button=document.createElement('button');button.id='tool-'+action;button.dataset.action=action;button.title=toolLabels[action]||entry.title;button.setAttribute('aria-label',button.title);
+ const icon=document.createElement('span');icon.className=entry.className;icon.setAttribute('aria-hidden','true');button.append(icon);
+ button.addEventListener('mousedown',event=>event.stopPropagation());
+ button.onclick=event=>{editor.get('dragging').cancel();closeFileMenu();$('extra-tools').hidden=true;highlightTool(button.id);editor.get('palette').triggerEntry(action,'click',event);};
+ if(entry.action?.dragstart){button.draggable=true;button.ondragstart=event=>{editor.get('dragging').cancel();highlightTool(button.id);editor.get('palette').triggerEntry(action,'dragstart',event);};}
+ parent.append(button);
+}
+['hand-tool','create.task','create.exclusive-gateway','create.start-event','create.end-event','global-connect-tool'].forEach(action=>paletteButton(action,$('drawing-tools')));
+const moreTools=document.createElement('button');moreTools.id='more-tools';moreTools.textContent='⋮';moreTools.title='Autres outils BPMN';moreTools.setAttribute('aria-label','Autres outils BPMN');moreTools.setAttribute('aria-expanded','false');moreTools.onclick=()=>{const open=$('extra-tools').hidden;$('extra-tools').hidden=!open;moreTools.setAttribute('aria-expanded',String(open));closeFileMenu();};$('drawing-tools').append(moreTools);
+['lasso-tool','space-tool','create.intermediate-event','create.subprocess-expanded','create.participant-expanded','create.data-object','create.data-store','create.group'].forEach(action=>paletteButton(action,$('extra-tools')));
+editor.on('drag.cleanup',400,()=>highlightTool('select-tool'));
+document.addEventListener('keydown',event=>{
+ const typing=event.target.closest?.('input,textarea,select,[contenteditable="true"]');
+ if(event.key==='Escape'){closeFileMenu();$('extra-tools').hidden=true;return;}
+ if(typing||document.querySelector('dialog[open]'))return;
+ const modifier=event.ctrlKey||event.metaKey,key=event.key.toLowerCase();
+ if(modifier&&key==='o'){event.preventDefault();$('open').click();return;}
+ if(modifier&&event.shiftKey&&key==='s'){event.preventDefault();$('export').click();return;}
+ if(modifier&&event.shiftKey&&key==='e'){event.preventDefault();$('svg').click();return;}
+ if(modifier||event.altKey)return;
+ if(key==='v'){event.preventDefault();selectPointer();return;}
+ const shortcuts={h:'hand-tool',t:'create.task',d:'create.exclusive-gateway',c:'create.start-event',f:'create.end-event',a:'global-connect-tool'};
+ if(shortcuts[key]){event.preventDefault();$('tool-'+shortcuts[key])?.click();}
+});
+// Repaint once the complete set of lanes is available, including after adding or removing one.
+let lanePaintFrame=null;
+function refreshLaneColors(){
+ if(lanePaintFrame!==null)return;
+ lanePaintFrame=requestAnimationFrame(()=>{lanePaintFrame=null;const registry=editor.get('elementRegistry'),graphics=editor.get('graphicsFactory');registry.getAll().filter(el=>el.type==='bpmn:Lane').forEach(lane=>{const gfx=registry.getGraphics(lane);if(gfx)graphics.update('shape',lane,gfx);});});
+}
+editor.on(['import.done','commandStack.changed'],500,refreshLaneColors);
+let selected=null,timer=null,idleSave=null,busy=true,dirty=false,revision=0,moving=false,magnetism=false;
+// Keep all sibling lanes equal, with the whole adjustment in one undo operation.
+const laneModeling=editor.get('modeling'),laneStack=editor.get('commandStack');
+const originalLaneResize=laneModeling.resizeLane.bind(laneModeling),originalLaneAdd=laneModeling.addLane.bind(laneModeling);
+let equalizingLanes=false;
+function elementBounds(el){return el?{x:el.x,y:el.y,width:el.width,height:el.height}:null;}
+function sameBounds(el,bounds){return !!el&&!!bounds&&['x','y','width','height'].every(key=>el[key]===bounds[key]);}
+function copyPoints(points){return points.map(point=>({...point,...(point.original?{original:{...point.original}}:{})}));}
+function SafeLaneWidth(){}
+SafeLaneWidth.prototype.preExecute=function(context){
+ const snapshots=editor.get('elementRegistry').getAll().filter(el=>el.waypoints&&!el.labelTarget).map(connection=>({connection,source:elementBounds(connection.source),target:elementBounds(connection.target),points:copyPoints(connection.waypoints),label:connection.label?elementBounds(connection.label):null}));
+ originalLaneResize(context.shape,context.bounds,context.balanced);
+ snapshots.forEach(saved=>{
+  const connection=saved.connection;
+  if(!sameBounds(connection.source,saved.source)||!sameBounds(connection.target,saved.target))return;
+  if(JSON.stringify(connection.waypoints)!==JSON.stringify(saved.points))laneModeling.updateWaypoints(connection,copyPoints(saved.points),{labelBehavior:false});
+  if(saved.label&&connection.label&&(connection.label.x!==saved.label.x||connection.label.y!==saved.label.y))laneModeling.moveShape(connection.label,{x:saved.label.x-connection.label.x,y:saved.label.y-connection.label.y},null,{layout:false,autoResize:false});
+ });
+};
+SafeLaneWidth.prototype.execute=function(){return[];};SafeLaneWidth.prototype.revert=function(){return[];};
+laneStack.registerHandler('lanes.safeWidth',SafeLaneWidth);
+function UniformLanes(){}
+UniformLanes.prototype.preExecute=function(context){
+ equalizingLanes=true;
+ try{
+  if(context.add){context.newLane=originalLaneAdd(context.target,context.location);context.parent=context.newLane.parent;}
+  let lanes=(context.parent?.children||[]).filter(el=>el.type==='bpmn:Lane').sort((a,b)=>a.y-b.y);
+  if(!lanes.length)return;
+  let height=Math.max(120,Math.round(context.height));
+  const nodes=editor.get('elementRegistry').getAll().filter(el=>!el.labelTarget&&el.businessObject?.$instanceOf('bpmn:FlowNode'));
+  lanes.forEach(lane=>{
+   nodes.filter(node=>node.parent===lane.parent&&node.y+node.height/2>=lane.y&&node.y+node.height/2<lane.y+lane.height).forEach(node=>{height=Math.max(height,Math.ceil(node.y+node.height-lane.y+24));});
+  });
+  if(context.bounds&&context.shape&&Math.abs(context.bounds.width-context.shape.width)>0.5){
+   const shape=context.shape;laneStack.execute('lanes.safeWidth',{shape,bounds:{x:context.bounds.x,y:shape.y,width:context.bounds.width,height:shape.height},balanced:false});
+  }
+  lanes.forEach(lane=>{if(Math.abs(lane.height-height)>0.5)originalLaneResize(lane,{x:lane.x,y:lane.y,width:lane.width,height},false);});
+  lanes.forEach((lane,index)=>{if(!lane.businessObject.name)laneModeling.updateProperties(lane,{name:'Acteur '+(index+1)});});
+ }finally{equalizingLanes=false;}
+};
+UniformLanes.prototype.execute=function(){return[];};UniformLanes.prototype.revert=function(){return[];};
+laneStack.registerHandler('lanes.uniform',UniformLanes);
+laneModeling.resizeLane=function(shape,bounds,balanced){
+ if(equalizingLanes)return originalLaneResize(shape,bounds,balanced);
+ if(shape.type==='bpmn:Lane'&&Math.abs(bounds.height-shape.height)>=0.5){laneStack.execute('lanes.uniform',{parent:shape.parent,shape,bounds,height:bounds.height});return;}
+ if((shape.type==='bpmn:Lane'||shape.type==='bpmn:Participant')&&Math.abs(bounds.width-shape.width)>=0.5){laneStack.execute('lanes.safeWidth',{shape,bounds,balanced});return;}
+ return originalLaneResize(shape,bounds,balanced);
+};
+laneModeling.addLane=function(target,location){
+ if(equalizingLanes)return originalLaneAdd(target,location);
+ const parent=target.type==='bpmn:Lane'?target.parent:target,lanes=(parent.children||[]).filter(el=>el.type==='bpmn:Lane').sort((a,b)=>a.y-b.y);
+ const context={add:true,target,location,height:lanes[0]?.height||target.height||180};
+ laneStack.execute('lanes.uniform',context);return context.newLane;
+};
+let actorToRename=null;
+function sizableShape(el){return !!el&&!el.labelTarget&&!el.waypoints&&!!el.businessObject&&(el.businessObject.$instanceOf('bpmn:Activity')||el.businessObject.$instanceOf('bpmn:Event')||el.businessObject.$instanceOf('bpmn:Gateway'));}
+function roundShape(el){return el.businessObject.$instanceOf('bpmn:Event')||el.businessObject.$instanceOf('bpmn:Gateway');}
+// Expose native corner handles for tasks and collapsed sub-processes.
+editor.on('commandStack.shape.resize.canExecute',2000,event=>{
+ const context=event.context,el=context.shape;
+ if(!el||el.labelTarget||!el.businessObject?.$instanceOf('bpmn:Activity'))return;
+ if(el.type==='bpmn:SubProcess'&&el.di?.isExpanded)return;
+ return !context.newBounds||(context.newBounds.width>=100&&context.newBounds.height>=80);
+});
+function updateSizeFields(){const show=sizableShape(selected);$('size-fields').hidden=!show;if(show){$('shape-width').value=Math.round(selected.width);$('shape-height').value=Math.round(selected.height);$('shape-height').disabled=roundShape(selected);}}
+function resizeSelected(width,height){
+ if(!sizableShape(selected))return;
+ if(!Number.isFinite(width)||!Number.isFinite(height)||width<32||height<32||width>2000||height>2000){notify('Choisissez des dimensions entre 32 et 2 000.');return;}
+ if(roundShape(selected)){height=width;}else{width=Math.max(100,width);height=Math.max(80,height);}
+ const shape=selected;
+ laneModeling.resizeShape(shape,{x:shape.x+(shape.width-width)/2,y:shape.y+(shape.height-height)/2,width:Math.round(width),height:Math.round(height)});
+ updateSizeFields();
+}
+$('smaller-shape').onclick=()=>{if(sizableShape(selected))resizeSelected(Math.max(roundShape(selected)?32:100,Math.round(selected.width/1.1)),Math.max(roundShape(selected)?32:80,Math.round(selected.height/1.1)));};
+$('larger-shape').onclick=()=>{if(sizableShape(selected))resizeSelected(Math.round(selected.width*1.1),Math.round(selected.height*1.1));};
+editor.on('shape.changed',event=>{if(event.element===selected&&$('properties').style.display==='block')updateSizeFields();});
+editor.on('element.dblclick',2000,event=>{const el=event.element;if(el.type!=='bpmn:Lane'&&!(el.type==='bpmn:Participant'&&el.businessObject.processRef))return;actorToRename=el;$('actor-title').textContent=el.type==='bpmn:Lane'?'Nom de l’acteur':'Nom de l’organisation';$('actor-name').value=el.businessObject.name||'';$('actor-dialog').showModal();$('actor-name').focus();$('actor-name').select();return false;});
+$('cancel-actor').onclick=()=>$('actor-dialog').close();$('actor-form').onsubmit=event=>{event.preventDefault();if(actorToRename)editor.get('modeling').updateProperties(actorToRename,{name:$('actor-name').value.trim()});$('actor-dialog').close();};
+function keepActorColumnClear(){
+ const registry=editor.get('elementRegistry'),modeling=editor.get('modeling');
+ registry.getAll().filter(el=>el.type==='bpmn:Participant'&&el.businessObject.processRef).forEach(pool=>{
+  const lanes=(pool.children||[]).filter(el=>el.type==='bpmn:Lane');if(!lanes.length)return;
+  const nodes=(pool.children||[]).filter(el=>!el.labelTarget&&!el.host&&el.businessObject?.$instanceOf('bpmn:FlowNode'));
+  if(!nodes.length)return;const minimum=Math.min(...lanes.map(lane=>lane.x))+184,left=Math.min(...nodes.map(node=>node.x));
+  if(left<minimum)modeling.moveElements(nodes,{x:minimum-left,y:0},pool);
+ });
+}
+const smoothZoom=(()=>{
+ const canvas=editor.get('canvas'),control=editor.get('zoomScroll');
+ let frame=null,target=null,current=1,anchor=null,lastTime=null,dx=0,dy=0;
+ const clamp=value=>Math.max(0.2,Math.min(4,value));
+ function stop(){if(frame!==null)cancelAnimationFrame(frame);frame=null;target=null;lastTime=null;dx=dy=0;if(dirty)scheduleSave();}
+ function tick(time){
+  frame=null;
+  const dt=lastTime===null?16:Math.min(48,time-lastTime);lastTime=time;
+  if(dx||dy){canvas.scroll({dx,dy});dx=dy=0;}
+  if(target!==null){
+   const difference=Math.log(target/current),finished=Math.abs(difference)<0.0005;
+   current=finished?target:current*Math.exp(difference*(1-Math.exp(-dt/45)));
+   canvas.zoom(current,anchor);
+   const label=Math.round(current*100)+' %';if($('zoom').textContent!==label)$('zoom').textContent=label;
+   if(finished)target=null;
+  }
+  if(target!==null||dx||dy)frame=requestAnimationFrame(tick);
+  else{lastTime=null;if(dirty)scheduleSave();}
+ }
+ function queue(){cancelSave();if(frame===null)frame=requestAnimationFrame(tick);}
+ function zoomBy(factor,position){
+  if(target===null){current=canvas.zoom();target=current;}
+  target=clamp(target*factor);
+  const size=canvas.getSize();anchor=position||{x:size.width/2,y:size.height/2};queue();
+ }
+ control.zoom=(delta,position)=>zoomBy(Math.exp(Math.max(-1.5,Math.min(1.5,delta))*0.25),position);
+ control.stepZoom=(delta,position)=>zoomBy(Math.exp(delta*0.28),position);
+ control.scroll=delta=>{dx+=delta.dx||0;dy+=delta.dy||0;queue();};
+ editor.on(['drag.init','diagram.clear','diagram.destroy'],2500,stop);
+ return {stop};
+})();
+const alignment=editor.get('snapping'),originalSnap=alignment.snap;
+alignment.snap=function(...args){if(magnetism)return originalSnap.apply(this,args);};
+$('magnetism').onclick=()=>{magnetism=!magnetism;editor.get('gridSnapping').setActive(magnetism);if(!magnetism)alignment.hide();$('magnetism').textContent='Aimantation : '+(magnetism?'oui':'non');$('magnetism').setAttribute('aria-pressed',String(magnetism));};
+function notify(text){$('toast').textContent=text;$('toast').style.display='block';clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('toast').style.display='none',4000);}
+function zoomText(){const label=Math.round(editor.get('canvas').zoom()*100)+' %';if($('zoom').textContent!==label)$('zoom').textContent=label;}
+function fit(){smoothZoom.stop();const canvas=editor.get('canvas');canvas.zoom('fit-viewport','auto');canvas.zoom(Math.min(0.7,canvas.zoom()*0.8),{x:canvas.getSize().width/2,y:canvas.getSize().height/2});zoomText();}
+function starterXML(){
+ const lanes=[1,2,3];
+ return `<?xml version="1.0" encoding="UTF-8"?><bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" id="Definitions_Starter" targetNamespace="https://atelier-bpmn.example"><bpmn:collaboration id="Collaboration_Starter"><bpmn:participant id="Participant_Starter" name="Processus métier" processRef="Process_Starter"/></bpmn:collaboration><bpmn:process id="Process_Starter" isExecutable="false"><bpmn:laneSet id="LaneSet_Starter">${lanes.map(i=>`<bpmn:lane id="Lane_Starter_${i}" name="Acteur ${i}">${i===1?'<bpmn:flowNodeRef>Start_Starter</bpmn:flowNodeRef>':''}</bpmn:lane>`).join('')}</bpmn:laneSet><bpmn:startEvent id="Start_Starter"/></bpmn:process><bpmndi:BPMNDiagram id="Diagram_Starter"><bpmndi:BPMNPlane id="Plane_Starter" bpmnElement="Collaboration_Starter"><bpmndi:BPMNShape id="Participant_Starter_di" bpmnElement="Participant_Starter" isHorizontal="true"><dc:Bounds x="100" y="150" width="1200" height="540"/></bpmndi:BPMNShape>${lanes.map(i=>`<bpmndi:BPMNShape id="Lane_Starter_${i}_di" bpmnElement="Lane_Starter_${i}" isHorizontal="true"><dc:Bounds x="130" y="${150+(i-1)*180}" width="1170" height="180"/></bpmndi:BPMNShape>`).join('')}<bpmndi:BPMNShape id="Start_Starter_di" bpmnElement="Start_Starter"><dc:Bounds x="270" y="222" width="36" height="36"/></bpmndi:BPMNShape></bpmndi:BPMNPlane></bpmndi:BPMNDiagram></bpmn:definitions>`;
+}
+async function createStarter(){await editor.importXML(starterXML());keepActorColumnClear();}
+function targetPool(){
+ let current=selected?.labelTarget||selected;
+ while(current){if(current.type==='bpmn:Participant'&&current.businessObject.processRef)return current;current=current.parent;}
+ return editor.get('elementRegistry').getAll().find(el=>el.type==='bpmn:Participant'&&el.businessObject.processRef);
+}
+function createPoolAroundDiagram(){
+ const canvas=editor.get('canvas'),root=canvas.getRootElement(),nodes=(root.children||[]).filter(el=>!el.waypoints&&!el.labelTarget&&el.type!=='bpmn:Group');
+ const left=nodes.length?Math.min(...nodes.map(el=>el.x))-140:100,top=nodes.length?Math.min(...nodes.map(el=>el.y))-70:150;
+ const width=nodes.length?Math.max(1200,Math.max(...nodes.map(el=>el.x+el.width))-left+100):1200;
+ const height=nodes.length?Math.max(180,Math.max(...nodes.map(el=>el.y+el.height))-top+70):180;
+ const shape=editor.get('elementFactory').createParticipantShape({isExpanded:true,width,height});
+ const pool=editor.get('modeling').createShape(shape,{x:left+width/2,y:top+height/2},root);
+ editor.get('modeling').updateProperties(pool,{name:'Processus métier'});return pool;
+}
+$('add-lane').onclick=()=>{
+ if(busy)return;
+ try{
+  const modeling=editor.get('modeling');let pool=targetPool()||createPoolAroundDiagram();
+  let lanes=(pool.children||[]).filter(el=>el.type==='bpmn:Lane').sort((a,b)=>a.y-b.y);
+  const lane=modeling.addLane(lanes.at(-1)||pool,'bottom');
+  lanes=(pool.children||[]).filter(el=>el.type==='bpmn:Lane').sort((a,b)=>a.y-b.y);
+  lanes.forEach((el,index)=>{if(!el.businessObject.name)modeling.updateProperties(el,{name:'Acteur '+(index+1)});});
+  editor.get('eventBus').fire('elements.changed',{elements:lanes});
+  keepActorColumnClear();editor.get('selection').select(lane);fit();notify('Couloir ajouté. Double-cliquez sur son nom pour le renommer.');
+ }catch(error){notify('Ajout impossible : '+error.message);}
+};
+function cancelSave(){clearTimeout(timer);timer=null;if(idleSave!==null&&window.cancelIdleCallback)window.cancelIdleCallback(idleSave);idleSave=null;}
+function scheduleSave(){cancelSave();if(moving||busy)return;timer=setTimeout(()=>{timer=null;if(moving||busy)return;if(window.requestIdleCallback){idleSave=window.requestIdleCallback(()=>{idleSave=null;if(!moving&&!busy)save();},{timeout:3000});}else save();},1200);}
+async function save(){cancelSave();if(busy||moving)return;const rev=revision;try{const {xml}=await editor.saveXML({format:false});if(moving||busy||rev!==revision){scheduleSave();return;}localStorage.setItem(KEY,JSON.stringify({title:$('title').value,xml}));dirty=false;$('saved').textContent='✓ Enregistré';}catch{$('saved').textContent='Exportez pour conserver';}}
+function changed(){if(busy)return;dirty=true;revision++;if($('saved').textContent!=='Enregistrement…')$('saved').textContent='Enregistrement…';scheduleSave();}
+editor.on('drag.init',2000,()=>{moving=true;cancelSave();});
+editor.on('drag.cleanup',500,()=>{moving=false;if(dirty)scheduleSave();});
+editor.on('commandStack.changed',()=>{changed();const stack=editor.get('commandStack');$('undo').disabled=!stack.canUndo();$('redo').disabled=!stack.canRedo();});
+editor.on('canvas.viewbox.changed',zoomText);
+editor.on('selection.changed',e=>{selected=e.newSelection.length===1?e.newSelection[0]:null;propertyFields();});
+function propertyFields(){if($('properties').style.display!=='block')return;const bo=selected?.businessObject;$('property-empty').hidden=!!bo;$('property-fields').hidden=!bo;if(!bo)return;$('type').textContent=selected.type.replace('bpmn:','');$('label').value=bo.name||'';$('description').value=(bo.documentation||[]).map(d=>d.text).join('\n');updateSizeFields();}
+$('props-button').onclick=()=>{$('properties').style.display=$('properties').style.display==='block'?'none':'block';propertyFields();};$('close-props').onclick=()=>$('properties').style.display='none';
+$('apply').onclick=()=>{if(!selected)return;const width=Number($('shape-width').value),height=Number($('shape-height').value),resize=sizableShape(selected)&&(width!==Math.round(selected.width)||height!==Math.round(selected.height));let text=$('description').value.trim();editor.get('modeling').updateProperties(selected,{name:$('label').value,documentation:text?[editor.get('moddle').create('bpmn:Documentation',{text})]:[]});if(resize)resizeSelected(width,height);};
+$('undo').onclick=()=>editor.get('commandStack').undo();$('redo').onclick=()=>editor.get('commandStack').redo();$('minus').onclick=()=>editor.get('zoomScroll').stepZoom(-1);$('plus').onclick=()=>editor.get('zoomScroll').stepZoom(1);$('fit').onclick=fit;$('title').oninput=changed;
+function download(value,extension,mime,name){const url=URL.createObjectURL(value instanceof Blob?value:new Blob([value],{type:mime}));const a=document.createElement('a');a.href=url;a.download=(name||$('title').value.trim()||'Mon processus').replace(/[\\/:*?"<>|]/g,'_')+extension;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);}
+$('export').onclick=()=>{$('save-name').value=$('title').value||'Mon processus';$('save-dialog').showModal();};
+$('cancel-save').onclick=()=>$('save-dialog').close();
+$('save-form').onsubmit=async event=>{
+ event.preventDefault();const name=$('save-name').value.trim().replace(/\.bpmn$/i,'')||'Mon processus';
+ try{
+  let handle;
+  if(window.showSaveFilePicker){try{handle=await window.showSaveFilePicker({suggestedName:name+'.bpmn',types:[{description:'Diagramme BPMN 2.0',accept:{'application/xml':['.bpmn']}}]});}catch(error){if(error.name==='AbortError')return;}}
+  const {xml}=await editor.saveXML({format:true});
+  if(handle){const file=await handle.createWritable();await file.write(xml);await file.close();}else download(xml,'.bpmn','application/xml',name);
+  $('title').value=name;await save();$('save-dialog').close();notify('Diagramme enregistré.');
+ }catch(error){notify('Enregistrement impossible : '+error.message);}
+};
+$('svg').onclick=()=>{$('image-name').value=$('title').value||'Mon processus';$('image-dialog').showModal();};$('cancel-image').onclick=()=>$('image-dialog').close();
+$('image-form').onsubmit=async event=>{
+ event.preventDefault();$('image-submit').disabled=true;const name=$('image-name').value.trim().replace(/\.(png|svg)$/i,'')||'Mon processus';
+ try{
+  const {svg}=await editor.saveSVG(),root=new DOMParser().parseFromString(svg,'image/svg+xml').documentElement;
+  const box=(root.getAttribute('viewBox')||'0 0 1 1').split(/\s+/).map(Number),width=Math.max(1,box[2]),height=Math.max(1,box[3]);
+  if($('image-background').value==='white'){const background=document.createElementNS('http://www.w3.org/2000/svg','rect');Object.entries({x:box[0],y:box[1],width,height,fill:'#ffffff'}).forEach(([key,value])=>background.setAttribute(key,value));root.insertBefore(background,root.firstChild);}
+  const imageSvg=new XMLSerializer().serializeToString(root);
+  if($('image-format').value==='svg')download(imageSvg,'.svg','image/svg+xml',name);
+  else{
+   const url=URL.createObjectURL(new Blob([imageSvg],{type:'image/svg+xml'}));
+   try{
+    const image=new Image();await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(new Error('L’image du diagramme n’a pas pu être générée.'));image.src=url;});
+    const scale=Math.min(2,8192/width,8192/height,Math.sqrt(24000000/(width*height))),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(width*scale));canvas.height=Math.max(1,Math.round(height*scale));canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('Export PNG indisponible.');download(blob,'.png','image/png',name);
+   }finally{URL.revokeObjectURL(url);}
+  }
+  $('image-dialog').close();notify('Image exportée.');
+ }catch(error){notify('Export impossible : '+error.message);}finally{$('image-submit').disabled=false;}
+};
+$('new').onclick=()=>$('new-dialog').showModal();$('cancel-new').onclick=()=>$('new-dialog').close();$('confirm-new').onclick=async()=>{busy=true;cancelSave();try{await createStarter();$('title').value='Mon processus';fit();dirty=false;$('new-dialog').close();}catch(e){notify(e.message);}finally{busy=false;await save();}};
+$('open').onclick=()=>$('file').click();$('file').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!file)return;if(file.size>20e6){notify('Le fichier dépasse 20 Mo.');return;}clearTimeout(timer);timer=null;const previous=(await editor.saveXML({format:true})).xml;busy=true;try{const result=await editor.importXML(await file.text());$('title').value=file.name.replace(/\.(bpmn|xml)$/i,'');fit();notify(result.warnings?.length?'Diagramme ouvert avec '+result.warnings.length+' avertissement(s).':'Diagramme ouvert.');}catch(error){await editor.importXML(previous);fit();notify('Fichier BPMN illisible : '+error.message);}finally{busy=false;await save();}};
+$('help').onclick=()=>$('help-dialog').showModal();$('close-help').onclick=()=>$('help-dialog').close();
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&dirty&&!moving&&!busy)save();});
+(async()=>{let data;try{data=JSON.parse(localStorage.getItem(KEY)||'null');}catch{}try{if(data?.xml){await editor.importXML(data.xml);$('title').value=data.title||'Mon processus';}else await createStarter();keepActorColumnClear();}catch{await createStarter();notify('Un nouveau tableau a été ouvert.');}finally{busy=false;fit();await save();}})();
+</script></body></html>
