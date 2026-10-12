@@ -1,0 +1,10 @@
+{
+  "name": "processia",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tableau BPMN 2.0 gratuit et open source",
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build.cjs"
+  }
+}
