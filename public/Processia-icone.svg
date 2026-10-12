@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" role="img" aria-labelledby="title">
+ <title id="title">Processia</title>
+ <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M29 60h19M76 60h20" stroke="#142f49" stroke-width="5"/>
+  <circle cx="19" cy="60" r="10" stroke="#00868d" stroke-width="5"/>
+  <rect x="48" y="43" width="28" height="34" rx="7" fill="#00868d"/>
+  <path d="m105 48 12 12-12 12-12-12Z" fill="#fff8ed" stroke="#bc6b18" stroke-width="4"/>
+  <path d="M62 77v14h43V72" stroke="#00868d" stroke-width="4"/>
+ </g>
+
+</svg>
