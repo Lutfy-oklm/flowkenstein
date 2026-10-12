@@ -1219,6 +1219,8 @@ button:hover{background:#eaf5f5;border-color:#b8dedd}
 .processia-brand{height:38px;display:flex;align-items:center;pointer-events:none}.processia-brand img{display:block;width:125px;height:30px}@media(max-width:600px){.processia-brand img{width:105px;height:26px}}
 
 .file-menu{width:250px}.file-menu button{gap:9px;padding:10px 8px;font-size:12px}.file-menu kbd{font-size:9px}.file-menu .menu-icon{width:20px;font-size:18px}
+
+#return-content{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:15;height:40px;padding:0 22px;background:#fff;border:1px solid #e5e6f4;border-radius:10px;font-size:13px;color:#334152;box-shadow:0 2px 8px #142f4905}#return-content:hover{background:#f4f8fa;border-color:#bfd8dc}#return-content[hidden]{display:none}@media(max-width:600px){#return-content{bottom:64px;height:36px;font-size:12px;padding:0 17px}}
 </style></head><body>
 <div id="canvas" aria-label="Zone de dessin BPMN"></div>
 <div class="topbar"><button id="menu-toggle" class="menu-toggle" aria-label="Menu fichier" aria-expanded="false" aria-controls="file-menu">☰</button><div id="drawing-tools" class="drawing-tools" role="toolbar" aria-label="Outils de dessin BPMN"><button id="select-tool" class="active" title="Sélection (V)" aria-label="Sélection"><svg viewBox="0 0 24 24"><path d="M5 3l14 10-7 1-3 7z" fill="currentColor" stroke="none"/></svg></button><span class="divider"></span></div><div class="panel top-right"><input id="title" class="name" aria-label="Nom du diagramme" value="Mon processus" maxlength="150"><span id="saved" class="saved">Sur cet appareil</span><button id="add-lane" class="primary" title="Ajouter un couloir sous le dernier acteur">＋ Couloir</button></div></div>
@@ -1226,7 +1228,7 @@ button:hover{background:#eaf5f5;border-color:#b8dedd}
 <div id="extra-tools" class="extra-tools" role="toolbar" aria-label="Autres outils BPMN" hidden></div>
 <div class="bottom-left"><div class="zoom-controls"><button id="minus" aria-label="Dézoomer">−</button><span id="zoom">100 %</span><button id="plus" aria-label="Zoomer">＋</button></div><div class="history-controls"><button id="undo" title="Annuler" aria-label="Annuler">↶</button><button id="redo" title="Rétablir" aria-label="Rétablir">↷</button></div><div hidden><button id="fit">Centrer</button><button id="magnetism" aria-pressed="false">Aimantation : non</button></div></div>
 <div class="panel bottom-right"><button id="props-button">Propriétés</button></div>
-<div class="hint">Choisissez une forme en haut, puis placez-la sur le tableau · Double-cliquez pour écrire</div>
+<button id="return-content" hidden>Revenir au contenu</button>
 <aside id="properties"><div class="property-head">Propriétés <button id="close-props" aria-label="Fermer">×</button></div><div id="property-empty" class="empty-property">Sélectionnez une forme ou une connexion sur le diagramme.</div><div id="property-fields" hidden><div id="type" class="type"></div><label for="label">Libellé</label><textarea id="label" rows="3"></textarea><label for="description">Description</label><textarea id="description" rows="4"></textarea><div id="size-fields" hidden><label>Taille de l’élément</label><div style="display:flex;gap:10px"><label style="flex:1;margin:0">Largeur<input id="shape-width" type="number" min="32" max="2000" step="1" style="width:100%;padding:8px;border:1px solid #dce5ed;border-radius:5px;margin-top:5px"></label><label style="flex:1;margin:0">Hauteur<input id="shape-height" type="number" min="32" max="2000" step="1" style="width:100%;padding:8px;border:1px solid #dce5ed;border-radius:5px;margin-top:5px"></label></div><div style="display:flex;gap:8px;margin-top:10px"><button id="smaller-shape" style="flex:1" title="Réduire la forme de 10 %">− Taille</button><button id="larger-shape" style="flex:1" title="Agrandir la forme de 10 %">＋ Taille</button></div><p style="font-size:11px;color:#8590a0;line-height:1.5">Les tâches se redimensionnent aussi avec les poignées de leurs coins.</p></div><button id="apply" class="primary">Appliquer</button></div></aside>
 <input id="file" type="file" accept=".bpmn,.xml" hidden><div id="toast" role="status" aria-live="polite"></div>
 <dialog id="new-dialog"><h2>Nouveau diagramme</h2><p>Exportez le diagramme actuel si vous souhaitez le conserver. Vous pourrez le rouvrir à tout moment.</p><div class="actions"><button id="cancel-new">Annuler</button><button id="confirm-new" class="primary">Créer</button></div></dialog>
@@ -68945,6 +68947,24 @@ $('magnetism').onclick=()=>{magnetism=!magnetism;editor.get('gridSnapping').setA
 function notify(text){$('toast').textContent=text;$('toast').style.display='block';clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('toast').style.display='none',4000);}
 function zoomText(){const label=Math.round(editor.get('canvas').zoom()*100)+' %';if($('zoom').textContent!==label)$('zoom').textContent=label;}
 function fit(){smoothZoom.stop();const canvas=editor.get('canvas');canvas.zoom('fit-viewport','auto');canvas.zoom(Math.min(0.7,canvas.zoom()*0.8),{x:canvas.getSize().width/2,y:canvas.getSize().height/2});zoomText();}
+// Cache diagram bounds; panning and zooming only run a small visibility check.
+let contentBounds=[],contentVisibilityFrame=null;
+function refreshContentBounds(){
+ contentBounds=editor.get('elementRegistry').getAll().filter(el=>!el.labelTarget&&!el.waypoints&&Number.isFinite(el.x)&&Number.isFinite(el.y)&&el.width>0&&el.height>0).map(el=>({x:el.x,y:el.y,width:el.width,height:el.height}));
+ scheduleContentVisibility();
+}
+function scheduleContentVisibility(){
+ if(contentVisibilityFrame!==null)return;
+ contentVisibilityFrame=requestAnimationFrame(()=>{
+  contentVisibilityFrame=null;const box=editor.get('canvas').viewbox(),scale=box.scale||1;
+  const left=box.x+24/scale,right=box.x+box.width-24/scale,top=box.y+80/scale,bottom=box.y+box.height-64/scale;
+  const visible=contentBounds.some(bounds=>bounds.x+bounds.width>left&&bounds.x<right&&bounds.y+bounds.height>top&&bounds.y<bottom);
+  $('return-content').hidden=!contentBounds.length||visible;
+ });
+}
+$('return-content').onclick=()=>{fit();scheduleContentVisibility();};
+editor.on(['import.done','commandStack.changed'],refreshContentBounds);
+editor.on('canvas.viewbox.changed',scheduleContentVisibility);
 function starterXML(){
  const lanes=[1,2,3];
  return `<?xml version="1.0" encoding="UTF-8"?><bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" id="Definitions_Starter" targetNamespace="https://atelier-bpmn.example"><bpmn:collaboration id="Collaboration_Starter"><bpmn:participant id="Participant_Starter" name="Processus métier" processRef="Process_Starter"/></bpmn:collaboration><bpmn:process id="Process_Starter" isExecutable="false"><bpmn:laneSet id="LaneSet_Starter">${lanes.map(i=>`<bpmn:lane id="Lane_Starter_${i}" name="Acteur ${i}">${i===1?'<bpmn:flowNodeRef>Start_Starter</bpmn:flowNodeRef>':''}</bpmn:lane>`).join('')}</bpmn:laneSet><bpmn:startEvent id="Start_Starter"/></bpmn:process><bpmndi:BPMNDiagram id="Diagram_Starter"><bpmndi:BPMNPlane id="Plane_Starter" bpmnElement="Collaboration_Starter"><bpmndi:BPMNShape id="Participant_Starter_di" bpmnElement="Participant_Starter" isHorizontal="true"><dc:Bounds x="100" y="150" width="1200" height="540"/></bpmndi:BPMNShape>${lanes.map(i=>`<bpmndi:BPMNShape id="Lane_Starter_${i}_di" bpmnElement="Lane_Starter_${i}" isHorizontal="true"><dc:Bounds x="130" y="${150+(i-1)*180}" width="1170" height="180"/></bpmndi:BPMNShape>`).join('')}<bpmndi:BPMNShape id="Start_Starter_di" bpmnElement="Start_Starter"><dc:Bounds x="270" y="222" width="36" height="36"/></bpmndi:BPMNShape></bpmndi:BPMNPlane></bpmndi:BPMNDiagram></bpmn:definitions>`;
