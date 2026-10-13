@@ -1223,6 +1223,8 @@ button:hover{background:#eaf5f5;border-color:#b8dedd}
 #return-content{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:15;height:40px;padding:0 22px;background:#fff;border:1px solid #e5e6f4;border-radius:10px;font-size:13px;color:#334152;box-shadow:0 2px 8px #142f4905}#return-content:hover{background:#f4f8fa;border-color:#bfd8dc}#return-content[hidden]{display:none}@media(max-width:600px){#return-content{bottom:64px;height:36px;font-size:12px;padding:0 17px}}
 
 .djs-snap-line{display:none!important}
+
+#return-main-process{position:absolute;top:65px;left:12px;z-index:12;padding:10px 14px;background:white;border:1px solid #dce5ed;border-radius:9px;font-size:12px;color:#142f49;box-shadow:0 2px 8px #142f4908}#return-main-process:hover{background:#eaf5f5;border-color:#b8dedd}#return-main-process[hidden]{display:none}.bjs-breadcrumbs{display:none!important}@media(max-width:850px){#return-main-process{top:105px}}
 </style></head><body>
 <div id="canvas" aria-label="Zone de dessin BPMN"></div>
 <div class="topbar"><button id="menu-toggle" class="menu-toggle" aria-label="Menu fichier" aria-expanded="false" aria-controls="file-menu">☰</button><div id="drawing-tools" class="drawing-tools" role="toolbar" aria-label="Outils de dessin BPMN"><button id="select-tool" class="active" title="Sélection (V)" aria-label="Sélection"><svg viewBox="0 0 24 24"><path d="M5 3l14 10-7 1-3 7z" fill="currentColor" stroke="none"/></svg></button><span class="divider"></span></div><div class="panel top-right"><input id="title" class="name" aria-label="Nom du diagramme" value="Mon processus" maxlength="150"><span id="saved" class="saved">Sur cet appareil</span><button id="add-lane" class="primary" title="Ajouter un couloir sous le dernier acteur">＋ Couloir</button></div></div>
@@ -1231,6 +1233,7 @@ button:hover{background:#eaf5f5;border-color:#b8dedd}
 <div class="bottom-left"><div class="zoom-controls"><button id="minus" aria-label="Dézoomer">−</button><span id="zoom">100 %</span><button id="plus" aria-label="Zoomer">＋</button></div><div class="history-controls"><button id="undo" title="Annuler" aria-label="Annuler">↶</button><button id="redo" title="Rétablir" aria-label="Rétablir">↷</button></div><div hidden><button id="fit">Centrer</button><button id="magnetism" aria-pressed="false">Aimantation : non</button></div></div>
 <div class="panel bottom-right"><button id="props-button">Propriétés</button></div>
 <button id="return-content" hidden>Revenir au contenu</button>
+<button id="return-main-process" hidden>← Retour au processus principal</button>
 <aside id="properties"><div class="property-head">Propriétés <button id="close-props" aria-label="Fermer">×</button></div><div id="property-empty" class="empty-property">Sélectionnez une forme ou une connexion sur le diagramme.</div><div id="property-fields" hidden><div id="type" class="type"></div><label for="label">Libellé</label><textarea id="label" rows="3"></textarea><label for="description">Description</label><textarea id="description" rows="4"></textarea><div id="size-fields" hidden><label>Taille de l’élément</label><div style="display:flex;gap:10px"><label style="flex:1;margin:0">Largeur<input id="shape-width" type="number" min="32" max="2000" step="1" style="width:100%;padding:8px;border:1px solid #dce5ed;border-radius:5px;margin-top:5px"></label><label style="flex:1;margin:0">Hauteur<input id="shape-height" type="number" min="32" max="2000" step="1" style="width:100%;padding:8px;border:1px solid #dce5ed;border-radius:5px;margin-top:5px"></label></div><div style="display:flex;gap:8px;margin-top:10px"><button id="smaller-shape" style="flex:1" title="Réduire la forme de 10 %">− Taille</button><button id="larger-shape" style="flex:1" title="Agrandir la forme de 10 %">＋ Taille</button></div><p style="font-size:11px;color:#8590a0;line-height:1.5">Les tâches se redimensionnent aussi avec les poignées de leurs coins.</p></div><button id="apply" class="primary">Appliquer</button></div></aside>
 <input id="file" type="file" accept=".bpmn,.xml" hidden><div id="toast" role="status" aria-live="polite"></div>
 <dialog id="new-dialog"><h2>Nouveau diagramme</h2><p>Exportez le diagramme actuel si vous souhaitez le conserver. Vous pourrez le rouvrir à tout moment.</p><div class="actions"><button id="cancel-new">Annuler</button><button id="confirm-new" class="primary">Créer</button></div></dialog>
@@ -69058,10 +69061,25 @@ $('magnetism').onclick=()=>{magnetism=!magnetism;editor.get('gridSnapping').setA
 function notify(text){$('toast').textContent=text;$('toast').style.display='block';clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('toast').style.display='none',4000);}
 function zoomText(){const label=Math.round(editor.get('canvas').zoom()*100)+' %';if($('zoom').textContent!==label)$('zoom').textContent=label;}
 function fit(){smoothZoom.stop();const canvas=editor.get('canvas');canvas.zoom('fit-viewport','auto');canvas.zoom(Math.min(0.7,canvas.zoom()*0.8),{x:canvas.getSize().width/2,y:canvas.getSize().height/2});zoomText();}
+let mainProcessRoot=null;
+function updateProcessNavigation(root){
+ const subprocess=!!root?.businessObject?.$instanceOf('bpmn:SubProcess');
+ if(root&&!subprocess)mainProcessRoot=root;
+ if(!mainProcessRoot)mainProcessRoot=editor.get('canvas').getRootElements().find(el=>!el.businessObject?.$instanceOf('bpmn:SubProcess'))||null;
+ $('return-main-process').hidden=!subprocess||!mainProcessRoot;
+ if(subprocess)$('return-main-process').title=root.businessObject.name?'Quitter : '+root.businessObject.name:'Revenir au diagramme principal';
+}
+$('return-main-process').onclick=()=>{
+ const canvas=editor.get('canvas');if(!mainProcessRoot)return;
+ smoothZoom.stop();editor.get('selection').select([]);canvas.setRootElement(mainProcessRoot);zoomText();
+};
+editor.on('root.set',500,event=>{updateProcessNavigation(event.element);refreshContentBounds();});
+editor.on('diagram.clear',()=>{mainProcessRoot=null;$('return-main-process').hidden=true;});
 // Cache diagram bounds; panning and zooming only run a small visibility check.
 let contentBounds=[],contentVisibilityFrame=null;
 function refreshContentBounds(){
- contentBounds=editor.get('elementRegistry').getAll().filter(el=>!el.labelTarget&&!el.waypoints&&Number.isFinite(el.x)&&Number.isFinite(el.y)&&el.width>0&&el.height>0).map(el=>({x:el.x,y:el.y,width:el.width,height:el.height}));
+ const canvas=editor.get('canvas'),root=canvas.getRootElement();
+ contentBounds=editor.get('elementRegistry').getAll().filter(el=>canvas.findRoot(el)===root&&!el.labelTarget&&!el.waypoints&&Number.isFinite(el.x)&&Number.isFinite(el.y)&&el.width>0&&el.height>0).map(el=>({x:el.x,y:el.y,width:el.width,height:el.height}));
  scheduleContentVisibility();
 }
 function scheduleContentVisibility(){
