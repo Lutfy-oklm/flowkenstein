@@ -12551,7 +12551,11 @@
 	 *
 	 * @returns {Promise<SerializationResult, Error>}
 	 */
-	BpmnModdle.prototype.toXML = function(element, options) {
+	// PROCESSIA_SYNC_SAVE: flush committed edits before browser unload.
+ BpmnModdle.prototype.toXMLSync = function(element, options) {
+   return new Writer(options).toXML(element);
+ };
+ BpmnModdle.prototype.toXML = function(element, options) {
 
 	  var writer = new Writer(options);
 
@@ -17423,7 +17427,21 @@
 	 *
 	 * @return {Promise<SaveXMLResult>} A promise resolving with the XML.
 	 */
-	BaseViewer.prototype.saveXML = async function saveXML(options) {
+	BaseViewer.prototype.saveXMLSync = function(options) {
+   let definitions = this._definitions;
+   try {
+     if (!definitions) throw new Error('no definitions loaded');
+     definitions = this._emit('saveXML.start', { definitions }) || definitions;
+     let xml = this._moddle.toXMLSync(definitions, options || {});
+     xml = this._emit('saveXML.serialized', { xml }) || xml;
+     this._emit('saveXML.done', { xml });
+     return { xml };
+   } catch (error) {
+     this._emit('saveXML.done', { error });
+     throw error;
+   }
+ };
+ BaseViewer.prototype.saveXML = async function saveXML(options) {
 
 	  options = options || {};
 
