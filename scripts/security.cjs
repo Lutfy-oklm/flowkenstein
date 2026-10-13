@@ -1,7 +1,7 @@
 const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const root=path.resolve(__dirname,'..');
 const hashes=new Set();
-for(const name of ['atelier.html','Processia.html','index.html']){
+for(const name of ['atelier.html','index.html']){
  const html=fs.readFileSync(path.join(root,'public',name),'utf8');
  for(const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi))hashes.add("'sha256-"+crypto.createHash('sha256').update(match[1].replace(/\r\n?/g,'\n')).digest('base64')+"'");
 }

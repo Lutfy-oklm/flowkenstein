@@ -1,4 +1,6 @@
-const fs=require('fs');
+const fs=require('fs'),path=require('path');
+process.chdir(path.resolve(__dirname,'..'));
+fs.mkdirSync('public',{recursive:true});
 let html=fs.readFileSync('src/editor.html','utf8');
 let css=['diagram-js.css','bpmn.css','bpmn-js.css'].map(n=>fs.readFileSync('vendor/'+n,'utf8')).join('\n');
 const font=fs.readFileSync('vendor/font/bpmn.woff2').toString('base64');
@@ -6,9 +8,11 @@ css=css.replace(/@font-face\s*\{[\s\S]*?\}/,()=>"@font-face{font-family:'bpmn';s
 html=html.replace('<!--LIBRARY_STYLES-->',()=>'<style>'+css+'</style>');
 const lib=fs.readFileSync('vendor/bpmn-modeler.js','utf8').replace(/<\/script/gi,'<\\/script');
 html=html.replace('<!--LIBRARY_SCRIPT-->',()=>'<script>'+lib+'</script>');
-fs.writeFileSync('public/Processia.html',html);fs.writeFileSync('public/atelier.html',html);
-const home=fs.readFileSync('src/home.html','utf8').replaceAll('<!--LOGO_DATA-->','data:image/svg+xml;base64,'+fs.readFileSync('public/Processia-logo.svg').toString('base64'));
+fs.writeFileSync('public/atelier.html',html);
+const home=fs.readFileSync('src/home.html','utf8').replaceAll('<!--LOGO_DATA-->','data:image/svg+xml;base64,'+fs.readFileSync('public/Flowkenstein-logo.svg').toString('base64'));
 fs.writeFileSync('public/index.html',home);
 
 require('./pages.cjs');
 require('./security.cjs');
+
+require('./package.cjs');
