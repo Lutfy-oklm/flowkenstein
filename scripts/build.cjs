@@ -1,6 +1,6 @@
 const fs=require('fs');
 let html=fs.readFileSync('src/editor.html','utf8');
-let css=['diagram-js.css','bpmn.css'].map(n=>fs.readFileSync('vendor/'+n,'utf8')).join('\n');
+let css=['diagram-js.css','bpmn.css','bpmn-js.css'].map(n=>fs.readFileSync('vendor/'+n,'utf8')).join('\n');
 const font=fs.readFileSync('vendor/font/bpmn.woff2').toString('base64');
 css=css.replace(/@font-face\s*\{[\s\S]*?\}/,()=>"@font-face{font-family:'bpmn';src:url(data:font/woff2;base64,"+font+") format('woff2');font-weight:normal;font-style:normal}");
 html=html.replace('<!--LIBRARY_STYLES-->',()=>'<style>'+css+'</style>');
@@ -9,3 +9,5 @@ html=html.replace('<!--LIBRARY_SCRIPT-->',()=>'<script>'+lib+'</script>');
 fs.writeFileSync('public/Processia.html',html);fs.writeFileSync('public/atelier.html',html);
 const home=fs.readFileSync('src/home.html','utf8').replaceAll('<!--LOGO_DATA-->','data:image/svg+xml;base64,'+fs.readFileSync('public/Processia-logo.svg').toString('base64'));
 fs.writeFileSync('public/index.html',home);
+
+require('./security.cjs');
