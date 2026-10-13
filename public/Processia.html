@@ -68823,7 +68823,7 @@ function refreshLaneColors(){
  lanePaintFrame=requestAnimationFrame(()=>{lanePaintFrame=null;const registry=editor.get('elementRegistry'),graphics=editor.get('graphicsFactory');registry.getAll().filter(el=>el.type==='bpmn:Lane').forEach(lane=>{const gfx=registry.getGraphics(lane);if(gfx)graphics.update('shape',lane,gfx);});});
 }
 editor.on(['import.done','commandStack.changed'],500,refreshLaneColors);
-let selected=null,timer=null,idleSave=null,busy=true,dirty=false,revision=0,moving=false,magnetism=false;
+let selected=null,timer=null,idleSave=null,busy=true,dirty=false,revision=0,moving=false,magnetism=true;
 // Keep all sibling lanes equal, with the whole adjustment in one undo operation.
 const laneModeling=editor.get('modeling'),laneStack=editor.get('commandStack');
 const originalLaneResize=laneModeling.resizeLane.bind(laneModeling),originalLaneAdd=laneModeling.addLane.bind(laneModeling);
@@ -68997,7 +68997,46 @@ const smoothZoom=(()=>{
  return {stop};
 })();
 const alignment=editor.get('snapping'),originalSnap=alignment.snap;
-alignment.snap=function(...args){if(magnetism)return originalSnap.apply(this,args);};
+function nearestAlignment(value,values,tolerance){let best,distance=tolerance;for(const candidate of values||[]){const gap=Math.abs(candidate-value);if(gap<=distance){best=candidate;distance=gap;}}return best;}
+alignment.snap=function(event,snapPoints){
+ if(!magnetism)return;
+ const shape=event.context?.shape,scale=editor.get('canvas').zoom()||1;
+ const linked=shape?[...(shape.incoming||[]).map(c=>c.source),...(shape.outgoing||[]).map(c=>c.target)].filter(el=>el&&el!==shape&&!el.labelTarget&&el.businessObject?.$instanceOf('bpmn:FlowNode')):[];
+ // Include actors in other lanes; use centers rather than a coarse drawing grid.
+ if(shape?.businessObject?.$instanceOf('bpmn:FlowNode')){
+  const excluded=new Set((event.context.shapes||[shape]).map(el=>el.id));
+  editor.get('elementRegistry').getAll().filter(el=>!excluded.has(el.id)&&!el.labelTarget&&el.parent===shape.parent&&el.businessObject?.$instanceOf('bpmn:FlowNode')).forEach(el=>snapPoints.add('mid',{x:el.x+el.width/2,y:el.y+el.height/2}));
+ }
+ const nativePointSnap=snapPoints.snap;
+ snapPoints.snap=function(point,location,axis){
+  if(location==='mid'){
+   const connected=nearestAlignment(point[axis],linked.map(el=>el[axis]+(axis==='x'?el.width:el.height)/2),18/scale);
+   if(connected!==undefined)return connected;
+  }
+  return nearestAlignment(point[axis],this._snapValues[location]?.[axis],14/scale);
+ };
+ try{return originalSnap.call(this,event,snapPoints);}finally{snapPoints.snap=nativePointSnap;}
+};
+function straightAlignedFlow(connection,shapes,scale){
+ if(connection.type!=='bpmn:SequenceFlow'||connection.waypoints.length>4)return null;
+ const a=connection.source,b=connection.target;if(!a||!b||a.host||b.host)return null;
+ const ax=a.x+a.width/2,ay=a.y+a.height/2,bx=b.x+b.width/2,by=b.y+b.height/2;
+ let points,axis,value;
+ if(Math.abs(ax-bx)<0.01&&(a.y+a.height<=b.y||b.y+b.height<=a.y)){
+  axis='x';value=ax;points=[{x:ax,y:by>ay?a.y+a.height:a.y},{x:bx,y:by>ay?b.y:b.y+b.height}];
+ }else if(Math.abs(ay-by)<0.01&&(a.x+a.width<=b.x||b.x+b.width<=a.x)){
+  axis='y';value=ay;points=[{x:bx>ax?a.x+a.width:a.x,y:ay},{x:bx>ax?b.x:b.x+b.width,y:by}];
+ }else return null;
+ if(connection.waypoints.some(p=>Math.abs(p[axis]-value)>22/scale))return null;
+ const blocked=shapes.some(el=>el!==a&&el!==b&&el.parent===a.parent&&el.businessObject?.$instanceOf('bpmn:FlowNode')&&(axis==='x'?value>el.x&&value<el.x+el.width&&el.y<Math.max(points[0].y,points[1].y)&&el.y+el.height>Math.min(points[0].y,points[1].y):value>el.y&&value<el.y+el.height&&el.x<Math.max(points[0].x,points[1].x)&&el.x+el.width>Math.min(points[0].x,points[1].x)));
+ return blocked?null:points;
+}
+editor.on('commandStack.elements.move.postExecuted',500,event=>{
+ if(equalizingLanes)return;
+ const moved=(event.context.shapes||[]).filter(el=>el.businessObject?.$instanceOf('bpmn:FlowNode'));if(!moved.length)return;
+ const connections=new Set(moved.flatMap(el=>[...(el.incoming||[]),...(el.outgoing||[])])),shapes=editor.get('elementRegistry').getAll(),scale=editor.get('canvas').zoom()||1;
+ connections.forEach(connection=>{const points=straightAlignedFlow(connection,shapes,scale);if(points&&JSON.stringify(connection.waypoints)!==JSON.stringify(points))laneModeling.updateWaypoints(connection,points);});
+});
 $('magnetism').onclick=()=>{magnetism=!magnetism;editor.get('gridSnapping').setActive(magnetism);if(!magnetism)alignment.hide();$('magnetism').textContent='Aimantation : '+(magnetism?'oui':'non');$('magnetism').setAttribute('aria-pressed',String(magnetism));};
 function notify(text){$('toast').textContent=text;$('toast').style.display='block';clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('toast').style.display='none',4000);}
 function zoomText(){const label=Math.round(editor.get('canvas').zoom()*100)+' %';if($('zoom').textContent!==label)$('zoom').textContent=label;}
