@@ -4,6 +4,7 @@ const table=Array.from({length:256},(_,n)=>{let c=n;for(let k=0;k<8;k++)c=(c&1)?
 function crc(buf){let c=0xffffffff;for(const v of buf)c=table[(c^v)&255]^(c>>>8);return (c^0xffffffff)>>>0;}
 const files=[];
 for(const name of ['.gitignore','.vercelignore','LICENSE','README.md','package.json','vercel.json'])files.push(name);
+if(fs.existsSync(path.join(root,'README.fr.md')))files.push('README.fr.md');
 function walk(dir){for(const entry of fs.readdirSync(path.join(root,dir),{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){const name=dir+'/'+entry.name;if(entry.isDirectory())walk(name);else if(!name.endsWith('.zip'))files.push(name);}}
 for(const dir of ['src','scripts','vendor','public'])walk(dir);
 let offset=0;const local=[],central=[];
