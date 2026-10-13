@@ -10,4 +10,5 @@ fs.writeFileSync('public/Processia.html',html);fs.writeFileSync('public/atelier.
 const home=fs.readFileSync('src/home.html','utf8').replaceAll('<!--LOGO_DATA-->','data:image/svg+xml;base64,'+fs.readFileSync('public/Processia-logo.svg').toString('base64'));
 fs.writeFileSync('public/index.html',home);
 
+require('./pages.cjs');
 require('./security.cjs');
