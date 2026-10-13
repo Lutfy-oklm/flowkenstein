@@ -596,7 +596,43 @@ $('image-form').onsubmit=async event=>{
 };
 $('new').onclick=()=>$('new-dialog').showModal();$('cancel-new').onclick=()=>$('new-dialog').close();$('confirm-new').onclick=async()=>{busy=true;cancelSave();try{await createStarter();$('title').value='Mon processus';fit();dirty=false;$('new-dialog').close();}catch(e){notify(e.message);}finally{busy=false;await save();}};
 $('home').onclick=async()=>{await save();window.location.href=location.protocol==='file:'?'Accueil_Processia.html':'/';};
-$('open').onclick=()=>$('file').click();$('file').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!file)return;if(file.size>20e6){notify('Le fichier dépasse 20 Mo.');return;}clearTimeout(timer);timer=null;const previous=(await editor.saveXML({format:true})).xml;busy=true;try{const result=await editor.importXML(await file.text());$('title').value=file.name.replace(/\.(bpmn|xml)$/i,'');fit();notify(result.warnings?.length?'Diagramme ouvert avec '+result.warnings.length+' avertissement(s).':'Diagramme ouvert.');}catch(error){await editor.importXML(previous);fit();notify('Fichier BPMN illisible : '+error.message);}finally{busy=false;await save();}};
+function validateBpmnXML(xml) {
+ const fail=message=>{throw new Error(message);};
+ if(typeof xml!=='string'||xml.length>20000000)fail('Le fichier dépasse la taille autorisée.');
+ if(/<!\s*(?:DOCTYPE|ENTITY)\b/i.test(xml))fail('Les déclarations DTD et les entités XML ne sont pas autorisées.');
+ let openingTags=0;for(const tag of xml.matchAll(/<(?!!|\?|\/)[a-zA-Z_][\w:.-]*(?=[\s/>])/g))if(++openingTags>30000)fail('Le diagramme est trop complexe pour être ouvert en sécurité.');
+ const doc=new DOMParser().parseFromString(xml,'application/xml');
+ if(doc.getElementsByTagName('parsererror').length)fail('Le fichier XML est mal formé.');
+ for(const node of Array.from(doc.childNodes))if(node.nodeType===7&&node.nodeName!=='xml')fail('Les instructions de traitement XML ne sont pas autorisées.');
+ const root=doc.documentElement,ns='http://www.omg.org/spec/BPMN/20100524/MODEL';
+ if(!root||root.localName!=='definitions'||root.namespaceURI!==ns)fail('Choisissez un fichier BPMN 2.0 valide.');
+ const namespaces=new Set([ns,'http://www.omg.org/spec/BPMN/20100524/DI','http://www.omg.org/spec/DD/20100524/DC','http://www.omg.org/spec/DD/20100524/DI']);
+ const attrNamespaces=new Set([...namespaces,'http://www.w3.org/2000/xmlns/','http://www.w3.org/XML/1998/namespace','http://www.w3.org/2001/XMLSchema-instance','http://www.omg.org/spec/BPMN/non-normative/color/1.0','http://bpmn.io/schema/bpmn/biocolor/1.0']);
+ const stack=[[root,0]];let count=0,flowNodes=0;
+ while(stack.length){
+  const [el,depth]=stack.pop();
+  if(++count>30000||depth>128)fail('Le diagramme est trop complexe pour être ouvert en sécurité.');
+  if(!namespaces.has(el.namespaceURI))fail('Ce fichier contient une extension non prise en charge. Exportez une version BPMN 2.0 standard.');
+  if(el.attributes.length>100)fail('Un élément contient trop d’attributs.');
+  if(el.namespaceURI===ns&&/(?:Task|Event|Gateway)$/.test(el.localName)&&++flowNodes>5000)fail('Le diagramme contient trop de formes.');
+  for(const a of Array.from(el.attributes)){
+   if(a.namespaceURI&&!attrNamespaces.has(a.namespaceURI))fail('Un attribut utilise une extension non prise en charge.');
+   if(a.value.length>10000||/^on/i.test(a.localName)||/^(?:href|src)$/i.test(a.localName))fail('Le fichier contient un attribut non autorisé.');
+   if(['fill','stroke','background-color','border-color','color'].includes(a.localName)&&!/^(?:#[0-9a-f]{3,8}|[a-z]{1,24}|(?:rgb|rgba|hsl|hsla)\([\d\s.,%+-]+\))$/i.test(a.value))fail('Une couleur du diagramme est invalide.');
+   if(['Bounds','waypoint'].includes(el.localName)&&['x','y','width','height'].includes(a.localName)){
+    const n=Number(a.value);if(!a.value.trim()||!Number.isFinite(n)||Math.abs(n)>1000000||(['width','height'].includes(a.localName)&&n<=0))fail('Les dimensions du diagramme sont invalides.');
+   }
+  }
+  for(const child of Array.from(el.childNodes)){
+   if(child.nodeType===1)stack.push([child,depth+1]);
+   else if((child.nodeType===3||child.nodeType===4)&&child.nodeValue.length>(el.localName==='documentation'||el.localName==='script'?100000:10000))fail('Un texte du diagramme est trop long.');
+   else if(child.nodeType===7)fail('Les instructions de traitement XML ne sont pas autorisées.');
+  }
+ }
+ return xml;
+}
+
+$('open').onclick=()=>$('file').click();$('file').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!file)return;if(file.size>20e6){notify('Le fichier dépasse 20 Mo.');return;}let checkedXML;try{checkedXML=validateBpmnXML(await file.text());}catch(error){notify(error.message);return;}cancelSave();const previous=(await editor.saveXML({format:true})).xml;busy=true;try{const result=await editor.importXML(checkedXML);$('title').value=file.name.replace(/\.(bpmn|xml)$/i,'');fit();notify(result.warnings?.length?'Diagramme ouvert avec '+result.warnings.length+' avertissement(s).':'Diagramme ouvert.');}catch(error){await editor.importXML(previous);fit();notify('Fichier BPMN illisible : '+error.message);}finally{busy=false;await save();}};
 $('help').onclick=()=>$('help-dialog').showModal();$('close-help').onclick=()=>$('help-dialog').close();
 window.addEventListener('beforeunload',e=>{flushDiagramSnapshot();if(dirty){e.preventDefault();e.returnValue='';}});
 window.addEventListener('pagehide',flushDiagramSnapshot);
@@ -607,5 +643,5 @@ function restoreCanvasView(view){
  canvas.setRootElement(root);smoothZoom.stop();const size=canvas.getSize(),scale=Math.max(0.2,Math.min(4,view.scale));
  canvas.viewbox({x:view.x,y:view.y,width:size.width/scale,height:size.height/scale});zoomText();return true;
 }
-(async()=>{let data,view;try{data=JSON.parse(localStorage.getItem(KEY)||'null');view=JSON.parse(localStorage.getItem(VIEW_KEY)||'null')||data?.view;}catch{}try{if(data?.xml){await editor.importXML(data.xml);$('title').value=data.title||'Mon processus';}else{await createStarter();view=null;}keepActorColumnClear();}catch{await createStarter();view=null;notify('Un nouveau tableau a été ouvert.');}finally{if(!restoreCanvasView(view))fit();busy=false;await save();}})();
+(async()=>{let data,view;try{data=JSON.parse(localStorage.getItem(KEY)||'null');view=JSON.parse(localStorage.getItem(VIEW_KEY)||'null')||data?.view;}catch{}try{if(data?.xml){await editor.importXML(validateBpmnXML(data.xml));$('title').value=data.title||'Mon processus';}else{await createStarter();view=null;}keepActorColumnClear();}catch{await createStarter();view=null;notify('Un nouveau tableau a été ouvert.');}finally{if(!restoreCanvasView(view))fit();busy=false;await save();}})();
 </script></body></html>
