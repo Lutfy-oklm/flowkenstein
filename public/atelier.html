@@ -68934,6 +68934,21 @@ laneModeling.addLane=function(target,location){
  const context={add:true,target,location,height:lanes[0]?.height||target.height||180};
  laneStack.execute('lanes.uniform',context);return context.newLane;
 };
+function synchronizeAutomaticLanes(context){
+ if(equalizingLanes)return;
+ const elements=context.shapes||[context.shape],pools=new Set();
+ elements.filter(el=>el&&!el.labelTarget&&el.businessObject?.$instanceOf('bpmn:FlowNode')).forEach(el=>{
+  let parent=el.parent;while(parent&&parent.type!=='bpmn:Participant')parent=parent.parent;
+  if(parent)pools.add(parent);
+ });
+ pools.forEach(parent=>{
+  const lanes=(parent.children||[]).filter(el=>el.type==='bpmn:Lane');if(lanes.length<2)return;
+  const height=Math.max(...lanes.map(lane=>lane.height));
+  if(lanes.some(lane=>Math.abs(lane.height-height)>0.5))laneStack.execute('lanes.uniform',{parent,height});
+ });
+}
+// Run after native auto-expansion, inside the original move/create/resize undo unit.
+editor.on(['commandStack.elements.move.postExecuted','commandStack.shape.create.postExecuted','commandStack.shape.resize.postExecuted','commandStack.shape.toggleCollapse.postExecuted'],50,event=>synchronizeAutomaticLanes(event.context));
 let actorToRename=null;
 function sizableShape(el){return !!el&&!el.labelTarget&&!el.waypoints&&!!el.businessObject&&(el.businessObject.$instanceOf('bpmn:Activity')||el.businessObject.$instanceOf('bpmn:Event')||el.businessObject.$instanceOf('bpmn:Gateway'));}
 function roundShape(el){return el.businessObject.$instanceOf('bpmn:Event')||el.businessObject.$instanceOf('bpmn:Gateway');}
