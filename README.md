@@ -1,4 +1,4 @@
-# Processia
+# Flowkenstein
 
 Un tableau libre, gratuit et en français pour cartographier les processus métier en BPMN 2.0.
 
@@ -14,7 +14,7 @@ Un tableau libre, gratuit et en français pour cartographier les processus méti
 ## Utilisation
 
 Le site prêt à servir est dans public/. Ouvrez public/index.html pour la page d’accueil,
-ou public/Processia.html pour accéder au tableau. Aucune installation n’est nécessaire.
+ou public/atelier.html pour accéder au tableau. Aucune installation n’est nécessaire.
 
 La sauvegarde automatique est propre à l’appareil, au navigateur et à l’adresse du site.
 Enregistrez vos diagrammes en fichiers BPMN pour les conserver et les transférer.
@@ -36,5 +36,5 @@ automatiquement une mise à jour via l’intégration GitHub de Vercel.
 
 ## Licence
 
-Le code original de Processia est sous licence MIT. La bibliothèque bpmn-js conserve
+Le code original de Flowkenstein est sous licence MIT. La bibliothèque bpmn-js conserve
 sa licence (vendor/LICENSE-bpmn-js.txt), qui impose l’affichage de son logo.
