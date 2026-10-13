@@ -13794,7 +13794,11 @@ button:hover{background:#eaf5f5;border-color:#b8dedd}
 	 *
 	 * @returns {Promise<SerializationResult, Error>}
 	 */
-	BpmnModdle.prototype.toXML = function(element, options) {
+	// PROCESSIA_SYNC_SAVE: flush committed edits before browser unload.
+ BpmnModdle.prototype.toXMLSync = function(element, options) {
+   return new Writer(options).toXML(element);
+ };
+ BpmnModdle.prototype.toXML = function(element, options) {
 
 	  var writer = new Writer(options);
 
@@ -18666,7 +18670,21 @@ button:hover{background:#eaf5f5;border-color:#b8dedd}
 	 *
 	 * @return {Promise<SaveXMLResult>} A promise resolving with the XML.
 	 */
-	BaseViewer.prototype.saveXML = async function saveXML(options) {
+	BaseViewer.prototype.saveXMLSync = function(options) {
+   let definitions = this._definitions;
+   try {
+     if (!definitions) throw new Error('no definitions loaded');
+     definitions = this._emit('saveXML.start', { definitions }) || definitions;
+     let xml = this._moddle.toXMLSync(definitions, options || {});
+     xml = this._emit('saveXML.serialized', { xml }) || xml;
+     this._emit('saveXML.done', { xml });
+     return { xml };
+   } catch (error) {
+     this._emit('saveXML.done', { error });
+     throw error;
+   }
+ };
+ BaseViewer.prototype.saveXML = async function saveXML(options) {
 
 	  options = options || {};
 
@@ -68700,6 +68718,7 @@ button:hover{background:#eaf5f5;border-color:#b8dedd}
 <script>
 'use strict';
 const $=id=>document.getElementById(id), KEY='bpmn-whiteboard-v1';
+const VIEW_KEY=KEY+'-view';let viewSaveTimer=null,saveQueued=false;
 // Apply the supplied PDF's palette without introducing extra undo commands.
 function PdfDesign(eventBus,bpmnRenderer){
  const navy='#142f49',teal='#00868d',orange='#bc6b18';
@@ -69103,6 +69122,7 @@ $('return-main-process').onclick=()=>{
  smoothZoom.stop();editor.get('selection').select([]);canvas.setRootElement(mainProcessRoot);zoomText();
 };
 editor.on('root.set',500,event=>{updateProcessNavigation(event.element);refreshContentBounds();});
+editor.on(['root.set','canvas.viewbox.changed'],400,rememberCanvasView);
 editor.on('diagram.clear',()=>{mainProcessRoot=null;$('return-main-process').hidden=true;});
 // Cache diagram bounds; panning and zooming only run a small visibility check.
 let contentBounds=[],contentVisibilityFrame=null;
@@ -69167,8 +69187,13 @@ $('add-lane').onclick=()=>{
  }catch(error){notify('Ajout impossible : '+error.message);}
 };
 function cancelSave(){clearTimeout(timer);timer=null;if(idleSave!==null&&window.cancelIdleCallback)window.cancelIdleCallback(idleSave);idleSave=null;}
-function scheduleSave(){cancelSave();if(moving||busy)return;timer=setTimeout(()=>{timer=null;if(moving||busy)return;if(window.requestIdleCallback){idleSave=window.requestIdleCallback(()=>{idleSave=null;if(!moving&&!busy)save();},{timeout:3000});}else save();},1200);}
-async function save(){cancelSave();if(busy||moving)return;const rev=revision;try{const {xml}=await editor.saveXML({format:false});if(moving||busy||rev!==revision){scheduleSave();return;}localStorage.setItem(KEY,JSON.stringify({title:$('title').value,xml}));dirty=false;$('saved').textContent='✓ Enregistré';}catch{$('saved').textContent='Exportez pour conserver';}}
+function captureCanvasView(){const canvas=editor.get('canvas'),box=canvas.viewbox();return{rootId:canvas.getRootElement().id,x:box.x,y:box.y,scale:box.scale};}
+function persistCanvasView(){if(busy)return;clearTimeout(viewSaveTimer);viewSaveTimer=null;try{localStorage.setItem(VIEW_KEY,JSON.stringify(captureCanvasView()));}catch{}}
+function rememberCanvasView(){if(busy)return;clearTimeout(viewSaveTimer);viewSaveTimer=setTimeout(persistCanvasView,200);}
+function storeDiagramSnapshot(xml){const view=captureCanvasView();localStorage.setItem(KEY,JSON.stringify({title:$('title').value,xml,view}));localStorage.setItem(VIEW_KEY,JSON.stringify(view));dirty=false;$('saved').textContent='✓ Enregistré';}
+function scheduleSave(){cancelSave();if(moving||busy||saveQueued)return;saveQueued=true;queueMicrotask(()=>{saveQueued=false;if(!moving&&!busy&&dirty)save();});}
+async function save(){cancelSave();if(busy||moving)return;const rev=revision;try{const {xml}=await editor.saveXML({format:false});if(moving||busy||rev!==revision){scheduleSave();return;}storeDiagramSnapshot(xml);}catch{$('saved').textContent='Exportez pour conserver';}}
+function flushDiagramSnapshot(){if(busy)return;cancelSave();try{if(dirty&&!moving)storeDiagramSnapshot(editor.saveXMLSync({format:false}).xml);persistCanvasView();}catch{$('saved').textContent='Exportez pour conserver';}}
 function changed(){if(busy)return;dirty=true;revision++;if($('saved').textContent!=='Enregistrement…')$('saved').textContent='Enregistrement…';scheduleSave();}
 editor.on('drag.init',2000,()=>{moving=true;cancelSave();});
 editor.on('drag.cleanup',500,()=>{moving=false;if(dirty)scheduleSave();});
@@ -69216,7 +69241,14 @@ $('new').onclick=()=>$('new-dialog').showModal();$('cancel-new').onclick=()=>$('
 $('home').onclick=async()=>{await save();window.location.href=location.protocol==='file:'?'Accueil_Processia.html':'/';};
 $('open').onclick=()=>$('file').click();$('file').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!file)return;if(file.size>20e6){notify('Le fichier dépasse 20 Mo.');return;}clearTimeout(timer);timer=null;const previous=(await editor.saveXML({format:true})).xml;busy=true;try{const result=await editor.importXML(await file.text());$('title').value=file.name.replace(/\.(bpmn|xml)$/i,'');fit();notify(result.warnings?.length?'Diagramme ouvert avec '+result.warnings.length+' avertissement(s).':'Diagramme ouvert.');}catch(error){await editor.importXML(previous);fit();notify('Fichier BPMN illisible : '+error.message);}finally{busy=false;await save();}};
 $('help').onclick=()=>$('help-dialog').showModal();$('close-help').onclick=()=>$('help-dialog').close();
-window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&dirty&&!moving&&!busy)save();});
-(async()=>{let data;try{data=JSON.parse(localStorage.getItem(KEY)||'null');}catch{}try{if(data?.xml){await editor.importXML(data.xml);$('title').value=data.title||'Mon processus';}else await createStarter();keepActorColumnClear();}catch{await createStarter();notify('Un nouveau tableau a été ouvert.');}finally{busy=false;fit();await save();}})();
+window.addEventListener('beforeunload',e=>{flushDiagramSnapshot();if(dirty){e.preventDefault();e.returnValue='';}});
+window.addEventListener('pagehide',flushDiagramSnapshot);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)flushDiagramSnapshot();});
+function restoreCanvasView(view){
+ if(!view||!Number.isFinite(view.x)||!Number.isFinite(view.y)||!Number.isFinite(view.scale)||view.scale<=0)return false;
+ const canvas=editor.get('canvas'),root=canvas.getRootElements().find(el=>el.id===view.rootId);if(!root)return false;
+ canvas.setRootElement(root);smoothZoom.stop();const size=canvas.getSize(),scale=Math.max(0.2,Math.min(4,view.scale));
+ canvas.viewbox({x:view.x,y:view.y,width:size.width/scale,height:size.height/scale});zoomText();return true;
+}
+(async()=>{let data,view;try{data=JSON.parse(localStorage.getItem(KEY)||'null');view=JSON.parse(localStorage.getItem(VIEW_KEY)||'null')||data?.view;}catch{}try{if(data?.xml){await editor.importXML(data.xml);$('title').value=data.title||'Mon processus';}else{await createStarter();view=null;}keepActorColumnClear();}catch{await createStarter();view=null;notify('Un nouveau tableau a été ouvert.');}finally{if(!restoreCanvasView(view))fit();busy=false;await save();}})();
 </script></body></html>
