@@ -1,5 +1,5 @@
 /*!
- * bpmn-js - bpmn-modeler v18.16.0
+ * bpmn-js - bpmn-modeler v18.31.0
  *
  * Copyright (c) 2014-present, camunda Services GmbH
  *
@@ -8,7 +8,7 @@
  *
  * Source Code: https://github.com/bpmn-io/bpmn-js
  *
- * Date: 2026-05-04
+ * Date: 2026-10-01
  */
 (function (global, factory) {
 	typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
@@ -16,7 +16,7 @@
 	(global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.BpmnJS = factory());
 })(this, (function () { 'use strict';
 
-	function e$2(e,t){t&&(e.super_=t,e.prototype=Object.create(t.prototype,{constructor:{value:e,enumerable:false,writable:true,configurable:true}}));}
+	function e$3(e,t){t&&(e.super_=t,e.prototype=Object.create(t.prototype,{constructor:{value:e,enumerable:false,writable:true,configurable:true}}));}
 
 	function getDefaultExportFromCjs$1 (x) {
 		return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
@@ -742,8 +742,9 @@
 	}
 
 	/**
+	 * @template {(...args: any[]) => any} T
 	 * @typedef { {
-	 *   (...args: any[]): any;
+	 *   (...args: Parameters<T>): void;
 	 *   flush: () => void;
 	 *   cancel: () => void;
 	 * } } DebouncedFunction
@@ -756,10 +757,12 @@
 	 * Lodash-style the function exposes methods to `#clear`
 	 * and `#flush` to control internal behavior.
 	 *
-	 * @param  {Function} fn
-	 * @param  {Number} timeout
+	 * @template {(...args: any[]) => any} T
 	 *
-	 * @return {DebouncedFunction} debounced function
+	 * @param  {T} fn
+	 * @param  {number} timeout
+	 *
+	 * @return {DebouncedFunction<T>} debounced function
 	 */
 	function debounce(fn, timeout) {
 
@@ -806,7 +809,7 @@
 	  }
 
 	  /**
-	   * @type { DebouncedFunction }
+	   * @type {DebouncedFunction<T>}
 	   */
 	  function callback(...args) {
 	    lastNow = Date.now();
@@ -2555,11 +2558,11 @@
 	var DEFAULT_RENDER_PRIORITY$1 = 1000;
 
 	/**
-	 * @typedef {import('../core/Types').ElementLike} Element
-	 * @typedef {import('../core/Types').ConnectionLike} Connection
-	 * @typedef {import('../core/Types').ShapeLike} Shape
+	 * @typedef {import('../core/Types.js').ElementLike} Element
+	 * @typedef {import('../core/Types.js').ConnectionLike} Connection
+	 * @typedef {import('../core/Types.js').ShapeLike} Shape
 	 *
-	 * @typedef {import('../core/EventBus').default} EventBus
+	 * @typedef {import('../core/EventBus.js').default} EventBus
 	 */
 
 	/**
@@ -2649,7 +2652,7 @@
 	/**
 	 * @typedef {(string|number)[]} Component
 	 *
-	 * @typedef {import('../util/Types').Point} Point
+	 * @typedef {import('./Types.js').Point} Point
 	 */
 
 	/**
@@ -2801,11 +2804,11 @@
 	}
 
 	/**
-	 * @typedef {import('../model/Types').Connection} Connection
-	 * @typedef {import('../model/Types').Element} Element
-	 * @typedef {import('../model/Types').Shape} Shape
+	 * @typedef {import('../model/Types.js').Connection} Connection
+	 * @typedef {import('../model/Types.js').Element} Element
+	 * @typedef {import('../model/Types.js').Shape} Shape
 	 *
-	 * @typedef {import('../util/Types').Rect} Rect
+	 * @typedef {import('./Types.js').Rect} Rect
 	 *
 	 * @typedef { {
 	 *   allShapes: Record<string, Shape>,
@@ -2825,48 +2828,22 @@
 	 */
 	function getParents$1(elements) {
 
+	  var elementsSet = new Set(elements);
+
 	  // find elements that are not children of any other elements
 	  return filter(elements, function(element) {
-	    return !find(elements, function(e) {
-	      return e !== element && getParent$1(element, e);
-	    });
+	    var parent = element.parent;
+
+	    while (parent) {
+	      if (elementsSet.has(parent)) {
+	        return false;
+	      }
+
+	      parent = parent.parent;
+	    }
+
+	    return true;
 	  });
-	}
-
-
-	function getParent$1(element, parent) {
-	  if (!parent) {
-	    return;
-	  }
-
-	  if (element === parent) {
-	    return parent;
-	  }
-
-	  if (!element.parent) {
-	    return;
-	  }
-
-	  return getParent$1(element.parent, parent);
-	}
-
-
-	/**
-	 * Adds an element to a collection and returns true if the
-	 * element was added.
-	 *
-	 * @param {Object[]} elements
-	 * @param {Object} element
-	 * @param {boolean} [unique]
-	 */
-	function add$1(elements, element, unique) {
-	  var canAdd = !unique || elements.indexOf(element) === -1;
-
-	  if (canAdd) {
-	    elements.push(element);
-	  }
-
-	  return canAdd;
 	}
 
 
@@ -2901,18 +2878,20 @@
 	/**
 	 * Collects self + child elements up to a given depth from a list of elements.
 	 *
+	 * The result is always a unique set of elements (no duplicates).
+	 *
 	 * @param {Element|Element[]} elements the elements to select the children from
-	 * @param {boolean} unique whether to return a unique result set (no duplicates)
+	 * @param {boolean} [unique] deprecated, ignored; the result is always unique
 	 * @param {number} maxDepth the depth to search through or -1 for infinite
 	 *
 	 * @return {Element[]} found elements
 	 */
 	function selfAndChildren(elements, unique, maxDepth) {
-	  var result = [],
-	      processedChildren = [];
+	  var result = new Set(),
+	      processedChildren = new Set();
 
 	  eachElement(elements, function(element, i, depth) {
-	    add$1(result, element, unique);
+	    result.add(element);
 
 	    var children = element.children;
 
@@ -2920,26 +2899,30 @@
 	    {
 
 	      // children exist && children not yet processed
-	      if (children && add$1(processedChildren, children, unique)) {
+	      if (children && !processedChildren.has(children)) {
+	        processedChildren.add(children);
+
 	        return children;
 	      }
 	    }
 	  });
 
-	  return result;
+	  return Array.from(result);
 	}
 
 
 	/**
-	 * Return self + ALL children for a number of elements
+	 * Return self + ALL children for a number of elements.
 	 *
-	 * @param {Element[]} elements to query
-	 * @param {boolean} [allowDuplicates] to allow duplicates in the result set
+	 * The result is always a unique set of elements (no duplicates).
+	 *
+	 * @param {Element|Element[]} elements to query
+	 * @param {boolean} [allowDuplicates] deprecated, ignored; the result is always unique
 	 *
 	 * @return {Element[]} the collected elements
 	 */
 	function selfAndAllChildren(elements, allowDuplicates) {
-	  return selfAndChildren(elements, !allowDuplicates);
+	  return selfAndChildren(elements);
 	}
 
 
@@ -3166,8 +3149,8 @@
 	}
 
 	/**
-	 * @typedef {import('../core/EventBus').default} EventBus
-	 * @typedef {import('./Styles').default} Styles
+	 * @typedef {import('../core/EventBus.js').default} EventBus
+	 * @typedef {import('./Styles.js').default} Styles
 	 */
 
 	// apply default renderer with lowest possible priority
@@ -3189,7 +3172,7 @@
 	  this.FRAME_STYLE = styles.style([ 'no-fill' ], { stroke: 'fuchsia', strokeDasharray: 4, strokeWidth: 2 });
 	}
 
-	e$2(DefaultRenderer, BaseRenderer);
+	e$3(DefaultRenderer, BaseRenderer);
 
 
 	/**
@@ -3460,9 +3443,9 @@
 	}
 
 	/**
-	 * @typedef {import('../util/Types').Axis} Axis
-	 * @typedef {import('../util/Types').Point} Point
-	 * @typedef {import('../util/Types').Rect} Rect
+	 * @typedef {import('./Types.js').Axis} Axis
+	 * @typedef {import('./Types.js').Point} Point
+	 * @typedef {import('./Types.js').Rect} Rect
 	 */
 
 	/**
@@ -4562,14 +4545,25 @@
 	}
 
 	/**
-	 * @typedef {import('../core/Types').ElementLike} Element
-	 * @typedef {import('../core/Types').ConnectionLike} Connection
+	 * Checks whether a value is an instance of Root.
 	 *
-	 * @typedef {import('../util/Types').DirectionTRBL} DirectionTRBL
-	 * @typedef {import('../util/Types').Intersection} Intersection
-	 * @typedef {import('../util/Types').Point} Point
-	 * @typedef {import('../util/Types').Rect} Rect
-	 * @typedef {import('../util/Types').RectTRBL} RectTRBL
+	 * @param {any} value
+	 *
+	 * @return {boolean}
+	 */
+	function isRoot(value) {
+	  return isObject(value) && isNil(value.parent);
+	}
+
+	/**
+	 * @typedef {import('../core/Types.js').ElementLike} Element
+	 * @typedef {import('../core/Types.js').ConnectionLike} Connection
+	 *
+	 * @typedef {import('../util/Types.js').DirectionTRBL} DirectionTRBL
+	 * @typedef {import('../util/Types.js').Intersection} Intersection
+	 * @typedef {import('../util/Types.js').Point} Point
+	 * @typedef {import('../util/Types.js').Rect} Rect
+	 * @typedef {import('../util/Types.js').RectTRBL} RectTRBL
 	 */
 
 	/**
@@ -4857,10 +4851,12 @@
 	}
 
 	/**
-	 * @typedef {import('./Types').ConnectionLike} ConnectionLike
-	 * @typedef {import('./Types').RootLike} RootLike
-	 * @typedef {import('./Types').ParentLike } ParentLike
-	 * @typedef {import('./Types').ShapeLike} ShapeLike
+	 * @typedef {import('./Types.js').ConnectionLike} ConnectionLike
+	 * @typedef {import('./Types.js').RootLike} RootLike
+	 * @typedef {import('./Types.js').ParentLike } ParentLike
+	 * @typedef {import('./Types.js').ShapeLike} ShapeLike
+	 *
+	 * @typedef {ShapeLike|ConnectionLike|RootLike|string} ElementOrIdentifier
 	 *
 	 * @typedef { {
 	 *   container?: HTMLElement;
@@ -4887,15 +4883,15 @@
 	 *   outer: Dimensions;
 	 * } & Rect } CanvasViewbox
 	 *
-	 * @typedef {import('./ElementRegistry').default} ElementRegistry
-	 * @typedef {import('./EventBus').default} EventBus
-	 * @typedef {import('./GraphicsFactory').default} GraphicsFactory
+	 * @typedef {import('./ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('./EventBus.js').default} EventBus
+	 * @typedef {import('./GraphicsFactory.js').default} GraphicsFactory
 	 *
-	 * @typedef {import('../util/Types').Dimensions} Dimensions
-	 * @typedef {import('../util/Types').Point} Point
-	 * @typedef {import('../util/Types').Rect} Rect
-	 * @typedef {import('../util/Types').RectTRBL} RectTRBL
-	 * @typedef {import('../util/Types').ScrollDelta} ScrollDelta
+	 * @typedef {import('../util/Types.js').Dimensions} Dimensions
+	 * @typedef {import('../util/Types.js').Point} Point
+	 * @typedef {import('../util/Types.js').Rect} Rect
+	 * @typedef {import('../util/Types.js').RectTRBL} RectTRBL
+	 * @typedef {import('../util/Types.js').ScrollDelta} ScrollDelta
 	 */
 
 	function round$c(number, resolution) {
@@ -4932,7 +4928,7 @@
 	  // this way we can always get the correct container size
 	  // (this is impossible for <svg> elements at the moment)
 	  const parent = document.createElement('div');
-	  parent.setAttribute('class', 'djs-container djs-parent');
+	  parent.setAttribute('class', 'djs-container djs-parent bio-theme-parent');
 
 	  assign(parent, {
 	    position: 'relative',
@@ -5085,8 +5081,15 @@
 	  // debounce canvas.viewbox.changed events when deferUpdate is set
 	  // to help with potential performance issues
 	  if (config.deferUpdate) {
-	    this._viewboxChanged = debounce(bind$1(this._viewboxChanged, this), 300);
+	    this._viewboxChanged = debounce(this._viewboxChanged, 300);
 	  }
+
+	  /**
+	   * Schedule focus restoration.
+	   *
+	   * @type {import('min-dash').DebouncedFunction<typeof this.restoreFocus>}
+	   */
+	  this._restoreFocus = debounce(this._restoreFocus, 0);
 
 	  eventBus.on('diagram.init', () => {
 
@@ -5126,6 +5129,8 @@
 	};
 
 	Canvas.prototype._destroy = function() {
+	  this._restoreFocus.cancel();
+
 	  this._eventBus.fire('canvas.destroy', {
 	    svg: this._svg,
 	    viewport: this._viewport
@@ -5189,9 +5194,17 @@
 	};
 
 	/**
-	* Sets focus on the canvas SVG element if `document.body` is currently focused.
-	*/
+	 * Restores focus on the canvas SVG element if `document.body` is
+	 * currently focused.
+	 *
+	 * Safely executes on the next render cycle - never prevents pending
+	 * (in flight) user clicks.
+	 */
 	Canvas.prototype.restoreFocus = function() {
+	  this._restoreFocus();
+	};
+
+	Canvas.prototype._restoreFocus = function() {
 	  if (document.activeElement === document.body) {
 	    this.focus();
 	  }
@@ -5393,26 +5406,40 @@
 
 
 	/**
-	 * Returns the plane which contains the given element.
+	 * Returns the plane which contains the given element(s).
 	 *
-	 * @param {ShapeLike|ConnectionLike|string} element The element or its ID.
+	 * If multiple elements are passed, the shared plane is returned
+	 * (or undefined if no shared plane exists).
+	 *
+	 * @param {ElementOrIdentifier|ElementOrIdentifier[]} element
 	 *
 	 * @return {RootLike|undefined} The root of the element.
 	 */
 	Canvas.prototype.findRoot = function(element) {
-	  if (typeof element === 'string') {
-	    element = this._elementRegistry.get(element);
+
+	  const elements = this._resolveElements(element);
+
+	  let root;
+
+	  for (const element of elements) {
+	    const plane = this._findPlaneForRoot(
+	      findRoot(element)
+	    );
+
+	    if (!plane) {
+	      return;
+	    }
+
+	    if (root && plane.rootElement !== root) {
+
+	      // no shared root
+	      return undefined;
+	    }
+
+	    root = plane.rootElement;
 	  }
 
-	  if (!element) {
-	    return;
-	  }
-
-	  const plane = this._findPlaneForRoot(
-	    findRoot(element)
-	  ) || {};
-
-	  return plane.rootElement;
+	  return root;
 	};
 
 	/**
@@ -5432,6 +5459,33 @@
 	  });
 	};
 
+	/**
+	 * @param {ElementOrIdentifier} element
+	 *
+	 * @return {ShapeLike|ConnectionLike|RootLike|undefined}
+	 */
+	Canvas.prototype._resolveElement = function(element) {
+
+	  if (typeof element === 'string') {
+	    return this._elementRegistry.get(element);
+	  }
+
+	  return element;
+	};
+
+	/**
+	 * @param {ElementOrIdentifier|ElementOrIdentifier[]} elements
+	 *
+	 * @return {Array<ShapeLike|ConnectionLike|RootLike>}
+	 */
+	Canvas.prototype._resolveElements = function(elements) {
+
+	  if (!isArray$2(elements)) {
+	    elements = [ elements ];
+	  }
+
+	  return elements.map(element => this._resolveElement(element)).filter(Boolean);
+	};
 
 	/**
 	 * Returns the html element that encloses the
@@ -5449,9 +5503,7 @@
 	Canvas.prototype._updateMarker = function(element, marker, add) {
 	  let container;
 
-	  if (!element.id) {
-	    element = this._elementRegistry.get(element);
-	  }
+	  element = this._resolveElement(element);
 
 	  element.markers = element.markers || new Set();
 
@@ -5534,9 +5586,7 @@
 	 * @param {string} marker The marker.
 	 */
 	Canvas.prototype.hasMarker = function(element, marker) {
-	  if (!element.id) {
-	    element = this._elementRegistry.get(element);
-	  }
+	  element = this._resolveElement(element);
 
 	  if (!element.markers) {
 	    return false;
@@ -5633,9 +5683,7 @@
 	 */
 	Canvas.prototype.removeRootElement = function(rootElement) {
 
-	  if (typeof rootElement === 'string') {
-	    rootElement = this._elementRegistry.get(rootElement);
-	  }
+	  rootElement = this._resolveElement(rootElement);
 
 	  const plane = this._findPlaneForRoot(rootElement);
 
@@ -6132,34 +6180,44 @@
 	};
 
 	/**
-	 * Scrolls the viewbox to contain the given element.
+	 * Scrolls the viewbox to contain the given element or elements.
 	 * Optionally specify a padding to be applied to the edges.
 	 *
-	 * @param {ShapeLike|ConnectionLike|string} element The element to scroll to or its ID.
+	 * The canvas navigates to the shared root of the element(s). If no shared
+	 * root can be found, no navigation is performed.
+	 *
+	 * @param {ElementOrIdentifier|ElementOrIdentifier[]} element The element(s) to scroll to or their ID(s).
 	 * @param {RectTRBL|number} [padding=100] The padding to be applied. Can also specify top, bottom, left and right.
 	 */
 	Canvas.prototype.scrollToElement = function(element, padding) {
 	  let defaultPadding = 100;
 
-	  if (typeof element === 'string') {
-	    element = this._elementRegistry.get(element);
+	  const elements = this._resolveElements(element);
+
+	  if (!elements.length) {
+	    return;
 	  }
 
-	  // set to correct rootElement
-	  const rootElement = this.findRoot(element);
+	  const rootElement = this.findRoot(elements);
+
+	  if (!rootElement) {
+	    return;
+	  }
 
 	  if (rootElement !== this.getRootElement()) {
 	    this.setRootElement(rootElement);
 	  }
 
-	  // element is rootElement, do not change viewport
-	  if (rootElement === element) {
+	  const visibleElements = elements.filter(e => e != rootElement);
+
+	  if (!visibleElements.length) {
 	    return;
 	  }
 
 	  if (!padding) {
 	    padding = {};
 	  }
+
 	  if (typeof padding === 'number') {
 	    defaultPadding = padding;
 	  }
@@ -6171,7 +6229,7 @@
 	    left: padding.left || defaultPadding
 	  };
 
-	  const elementBounds = getBBox(element),
+	  const elementBounds = getBBox(visibleElements),
 	        elementTrbl = asTRBL(elementBounds),
 	        viewboxBounds = this.viewbox(),
 	        zoom = this.zoom();
@@ -6410,9 +6468,9 @@
 	var ELEMENT_ID = 'data-element-id';
 
 	/**
-	 * @typedef {import('./Types').ElementLike} ElementLike
+	 * @typedef {import('./Types.js').ElementLike} ElementLike
 	 *
-	 * @typedef {import('./EventBus').default} EventBus
+	 * @typedef {import('./EventBus.js').default} EventBus
 	 *
 	 * @typedef { (element: ElementLike, gfx: SVGElement) => boolean|any } ElementRegistryFilterCallback
 	 * @typedef { (element: ElementLike, gfx: SVGElement) => any } ElementRegistryForEachCallback
@@ -6951,11 +7009,11 @@
 	    incomingRefs = new Refs({ name: 'incoming', collection: true }, { name: 'target' });
 
 	/**
-	 * @typedef {import('./Types').Element} Element
-	 * @typedef {import('./Types').Shape} Shape
-	 * @typedef {import('./Types').Root} Root
-	 * @typedef {import('./Types').Label} Label
-	 * @typedef {import('./Types').Connection} Connection
+	 * @typedef {import('./Types.js').Element} Element
+	 * @typedef {import('./Types.js').Shape} Shape
+	 * @typedef {import('./Types.js').Root} Root
+	 * @typedef {import('./Types.js').Label} Label
+	 * @typedef {import('./Types.js').Connection} Connection
 	 */
 
 	/**
@@ -7073,7 +7131,7 @@
 	  attacherRefs.bind(this, 'attachers');
 	}
 
-	e$2(ShapeImpl, ElementImpl);
+	e$3(ShapeImpl, ElementImpl);
 
 
 	/**
@@ -7096,7 +7154,7 @@
 	  parentRefs.bind(this, 'children');
 	}
 
-	e$2(RootImpl, ShapeImpl);
+	e$3(RootImpl, ShapeImpl);
 
 
 	/**
@@ -7119,7 +7177,7 @@
 	  labelRefs.bind(this, 'labelTarget');
 	}
 
-	e$2(LabelImpl, ShapeImpl);
+	e$3(LabelImpl, ShapeImpl);
 
 
 	/**
@@ -7150,7 +7208,7 @@
 	  incomingRefs.bind(this, 'target');
 	}
 
-	e$2(ConnectionImpl, ElementImpl);
+	e$3(ConnectionImpl, ElementImpl);
 
 
 	var types$6 = {
@@ -7274,11 +7332,11 @@
 	}
 
 	/**
-	 * @typedef {import('../model/Types').Element} Element
-	 * @typedef {import('../model/Types').Connection} Connection
-	 * @typedef {import('../model/Types').Label} Label
-	 * @typedef {import('../model/Types').Root} Root
-	 * @typedef {import('../model/Types').Shape} Shape
+	 * @typedef {import('../model/Types.js').Element} Element
+	 * @typedef {import('../model/Types.js').Connection} Connection
+	 * @typedef {import('../model/Types.js').Label} Label
+	 * @typedef {import('../model/Types.js').Root} Root
+	 * @typedef {import('../model/Types.js').Shape} Shape
 	 */
 
 	/**
@@ -7520,11 +7578,11 @@
 	 *
 	 * Returning anything but `undefined` from a listener will stop the listener propagation.
 	 *
-	 * @template T
+	 * @template {keyof EventMap} EventName
 	 *
-	 * @param {string|string[]} events to subscribe to
+	 * @param {EventName} events to subscribe to
 	 * @param {number} [priority=1000] listen priority
-	 * @param {EventBusEventCallback<T>} callback
+	 * @param {EventBusEventCallback<EventMap[EventName]>} callback
 	 * @param {any} [that] callback context
 	 */
 	/**
@@ -7539,11 +7597,11 @@
 	 *
 	 * Returning anything but `undefined` from a listener will stop the listener propagation.
 	 *
-	 * @template {keyof EventMap} EventName
+	 * @template T
 	 *
-	 * @param {EventName} events to subscribe to
+	 * @param {string|string[]} events to subscribe to
 	 * @param {number} [priority=1000] listen priority
-	 * @param {EventBusEventCallback<EventMap[EventName]>} callback
+	 * @param {EventBusEventCallback<T>} callback
 	 * @param {any} [that] callback context
 	 */
 	EventBus.prototype.on = function(events, priority, callback, that) {
@@ -7587,21 +7645,21 @@
 	 *
 	 * Register an event listener that is called only once.
 	 *
-	 * @template T
-	 *
-	 * @param {string|string[]} events to subscribe to
-	 * @param {number} [priority=1000] the listen priority
-	 * @param {EventBusEventCallback<T>} callback
-	 * @param {any} [that] callback context
-	 */
-	/**
-	 * Register an event listener that is called only once.
-	 *
 	 * @template {keyof EventMap} EventName
 	 *
 	 * @param {EventName} events to subscribe to
 	 * @param {number} [priority=1000] listen priority
 	 * @param {EventBusEventCallback<EventMap[EventName]>} callback
+	 * @param {any} [that] callback context
+	 */
+	/**
+	 * Register an event listener that is called only once.
+	 *
+	 * @template T
+	 *
+	 * @param {string|string[]} events to subscribe to
+	 * @param {number} [priority=1000] the listen priority
+	 * @param {EventBusEventCallback<T>} callback
 	 * @param {any} [that] callback context
 	 */
 	EventBus.prototype.once = function(events, priority, callback, that) {
@@ -8061,12 +8119,12 @@
 	}
 
 	/**
-	 * @typedef {import('./Types').ConnectionLike} ConnectionLike
-	 * @typedef {import('./Types').ElementLike} ElementLike
-	 * @typedef {import('./Types').ShapeLike} ShapeLike
+	 * @typedef {import('./Types.js').ConnectionLike} ConnectionLike
+	 * @typedef {import('./Types.js').ElementLike} ElementLike
+	 * @typedef {import('./Types.js').ShapeLike} ShapeLike
 	 *
-	 * @typedef {import('./ElementRegistry').default} ElementRegistry
-	 * @typedef {import('./EventBus').default} EventBus
+	 * @typedef {import('./ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('./EventBus.js').default} EventBus
 	 */
 
 	/**
@@ -8225,10 +8283,21 @@
 
 	    var childrenGfx = self._getChildrenContainer(parent);
 
-	    forEach(children.slice().reverse(), function(child) {
-	      var childGfx = elementRegistry.getGraphics(child);
+	    // only (re-)insert children that are not already in their expected
+	    // position; needlessly detaching and re-attaching siblings that did
+	    // not move breaks in-progress pointer interactions (the browser drops
+	    // the native `click` when the moused-down node is momentarily removed)
+	    // and causes unnecessary DOM churn
+	    var expected = childrenGfx.firstChild;
 
-	      prependTo(childGfx.parentNode, childrenGfx);
+	    forEach(children, function(child) {
+	      var childGfx = elementRegistry.getGraphics(child).parentNode;
+
+	      if (childGfx === expected) {
+	        expected = expected.nextSibling;
+	      } else {
+	        childrenGfx.insertBefore(childGfx, expected);
+	      }
 	    });
 	  });
 	};
@@ -8342,7 +8411,7 @@
 	function prependTo(newNode, parentNode, siblingNode) {
 	  var node = siblingNode || parentNode.firstChild;
 
-	  // do not prepend node to itself to prevent IE from crashing
+	  // do not prepend node to itself
 	  // https://github.com/bpmn-io/bpmn-js/issues/746
 	  if (newNode === node) {
 	    return;
@@ -8509,11 +8578,11 @@
 	 *
 	 * Resolves a diagram service.
 	 *
-	 * @template T
+	 * @template {keyof ServiceMap} Name
 	 *
-	 * @param {string} name The name of the service to get.
+	 * @param {Name} name The name of the service to get.
 	 *
-	 * @return {T}
+	 * @return {ServiceMap[Name]}
 	 */
 	/**
 	 * @overlord
@@ -8542,11 +8611,11 @@
 	/**
 	 * Resolves a diagram service.
 	 *
-	 * @template {keyof ServiceMap} Name
+	 * @template T
 	 *
-	 * @param {Name} name The name of the service to get.
+	 * @param {string} name The name of the service to get.
 	 *
-	 * @return {ServiceMap[Name]}
+	 * @return {T}
 	 */
 	Diagram.prototype.get = function(name, strict) {
 	  return this._injector.get(name, strict);
@@ -8600,13 +8669,108 @@
 	 */
 	function Base() { }
 
+	/**
+	 * @template { keyof this } K
+	 *
+	 * Get property value (typed)
+	 *
+	 * @overload
+	 *
+	 * @param {K} name
+	 *
+	 * @return { this[K] }
+	 */
+	/**
+	 * @template T
+	 *
+	 * Get property value
+	 *
+	 * @overload
+	 *
+	 * @param {string} name
+	 *
+	 * @return {T}
+	 */
+	/**
+	 * Get property value
+	 *
+	 * @overload
+	 *
+	 * @param {string} name
+	 *
+	 * @return {unknown}
+	 */
 	Base.prototype.get = function(name) {
 	  return this.$model.properties.get(this, name);
 	};
 
+	/**
+	 * @template { keyof this } K
+	 * @template { this[K] } V
+	 *
+	 * Set property value
+	 *
+	 * @overload
+	 *
+	 * @param {K} name
+	 * @param {V} value
+	 */
+	/**
+	 * @template { string } S
+	 *
+	 * Set property value
+	 *
+	 * @overload
+	 *
+	 * @param { S extends keyof this ? never : S } name
+	 * @param { any } value
+	 */
 	Base.prototype.set = function(name, value) {
 	  this.$model.properties.set(this, name, value);
 	};
+
+	/**
+	 * @typedef {import('./ns.js').Namespace} Namespace
+	 * @typedef {import('./moddle.js').default} Moddle
+	 * @typedef {import('./properties.js').default} Properties
+	 * @typedef {import('./registry.js').EffectiveDescriptor} EffectiveDescriptor
+	 * @typedef {import('./base.js').default} BaseElement
+	 * @typedef {import('./descriptor-builder.js').AnyTypeDescriptor} AnyTypeDescriptor
+	 */
+
+	/**
+	 * @template [T=Record<string,any>]
+	 * @typedef {{
+	 *   new(attrs?: Partial<T>): ModdleElement<T>;
+	 *   prototype: ModdleElement<T>;
+	 *   readonly $model: Moddle;
+	 *   readonly $descriptor: EffectiveDescriptor;
+	 * }} ModdleElementType
+	 */
+
+	/**
+	 * @template [T=Record<string,any>]
+	 * @typedef {BaseElement & T & {
+	 *   readonly $model: Moddle;
+	 *   readonly $descriptor: EffectiveDescriptor;
+	 *   readonly $type: Namespace['name'];
+	 *   readonly $attrs: Record<string, any>;
+	 *   $parent?: ModdleElement | AnyModdleElement;
+	 *   hasType: Moddle['hasType'];
+	 *   $instanceOf: Moddle['hasType'];
+	 * }} ModdleElement
+	 */
+
+	/**
+	 * @template [T=Record<string,any>]
+	 * @typedef {BaseElement & T & {
+	 *   $type: string;
+	 *   $instanceOf: (type: string) => boolean;
+	 *   $parent?: ModdleElement | AnyModdleElement;
+	 *   readonly $model: Moddle;
+	 *   readonly $descriptor: AnyTypeDescriptor;
+	 * }} AnyModdleElement
+	 */
 
 	/**
 	 * A model element factory.
@@ -8615,11 +8779,23 @@
 	 * @param {Properties} properties
 	 */
 	function Factory(model, properties) {
+
+	  /**
+	   * @private
+	   */
 	  this.model = model;
+
+	  /**
+	   * @private
+	   */
 	  this.properties = properties;
 	}
 
-
+	/**
+	 * @template [T=Record<string,any>]
+	 * @param {EffectiveDescriptor} descriptor
+	 * @return {ModdleElementType<T>}
+	 */
 	Factory.prototype.createType = function(descriptor) {
 
 	  var model = this.model;
@@ -8641,6 +8817,8 @@
 
 	  /**
 	   * The new type constructor
+	   *
+	   * @type { ModdleElementType }
 	   */
 	  function ModdleElement(attrs) {
 	    props.define(this, '$type', { value: name, enumerable: true });
@@ -8666,26 +8844,62 @@
 	/**
 	 * Built-in moddle types
 	 */
-	var BUILTINS = {
+	var BUILTINS = assign$1(Object.create(null), {
 	  String: true,
 	  Boolean: true,
 	  Integer: true,
 	  Real: true,
 	  Element: true
-	};
+	});
 
 	/**
-	 * Converters for built in types from string representations
+	 * Converters for built-in types from string representations
 	 */
-	var TYPE_CONVERTERS = {
+	var TYPE_CONVERTERS = assign$1(Object.create(null), {
 	  String: function(s) { return s; },
 	  Boolean: function(s) { return s === 'true'; },
 	  Integer: function(s) { return parseInt(s, 10); },
 	  Real: function(s) { return parseFloat(s); }
-	};
+	});
 
 	/**
+	 * @typedef {'String'} StringType
+	 * @typedef {'Boolean'} BooleanType
+	 * @typedef {'Integer'} IntegerType
+	 * @typedef {'Real'} RealType
+	 * @typedef {'Element'} ElementType
+	 * @typedef {StringType | BooleanType | IntegerType | RealType} BuiltInSimpleType
+	 * @typedef {BuiltInSimpleType | ElementType} BuiltInType
+	 */
+
+	/**
+	 * Convert given value to string
+	 * @overlord
+	 * @param {StringType} type
+	 * @param {any} value
+	 * @return {string}
+	 */
+	/**
+	 * Convert given value to boolean
+	 * @overlord
+	 * @param {BooleanType} type
+	 * @param {any} value
+	 * @return {boolean}
+	 */
+	/**
+	 * Convert given value to number
+	 * @overlord
+	 * @param {IntegerType | RealType} type
+	 * @param {any} value
+	 * @return {number}
+	 */
+	/**
 	 * Convert a type to its real representation
+	 * @template T
+	 * @overlord
+	 * @param {Exclude<string,BuiltInSimpleType>} type
+	 * @param {T} value
+	 * @return {T}
 	 */
 	function coerceType(type, value) {
 
@@ -8700,17 +8914,43 @@
 
 	/**
 	 * Return whether the given type is built-in
+	 * @overload
+	 * @param {BuiltInType} type
+	 * @return {true}
+	 */
+	/**
+	 * Return whether the given type is built-in
+	 * @overload
+	 * @param {Exclude<string,BuiltInType>} type
+	 * @return {false}
 	 */
 	function isBuiltIn(type) {
 	  return !!BUILTINS[type];
 	}
 
 	/**
-	 * Return whether the given type is simple
+	 * Return true if the given type is simple
+	 * @overload
+	 * @param {BuiltInSimpleType} type
+	 * @return {true}
+	 */
+	/**
+	 * Return false the given type is not simple
+	 * @overload
+	 * @param {Exclude<string,BuiltInSimpleType>} type
+	 * @return {false}
 	 */
 	function isSimple(type) {
 	  return !!TYPE_CONVERTERS[type];
 	}
+
+	/**
+	 * @typedef {{
+	 *   name: string;
+	 *   prefix: string;
+	 *   localName: string;
+	 * }} Namespace
+	 */
 
 	/**
 	 * Parses a namespaced attribute name of the form (ns:)localName to an object,
@@ -8719,7 +8959,7 @@
 	 * @param {String} name
 	 * @param {String} [defaultPrefix] the default prefix to take, if none is present.
 	 *
-	 * @return {Object} the parsed name
+	 * @return {Namespace} the parsed name
 	 */
 	function parseName(name, defaultPrefix) {
 	  var parts = name.split(/:/),
@@ -8751,18 +8991,97 @@
 	}
 
 	/**
+	 * @typedef {import('./ns.js').Namespace} Namespace
+	 * @typedef {import('./registry.js').RegisteredPackage} RegisteredPackage
+	 * @typedef {import('./registry.js').RegisteredTypeDef} RegisteredTypeDef
+	 * @typedef {import('./registry.js').RegisteredPropertyDef} RegisteredPropertyDef
+	 */
+
+	/**
+	 * Effective element descriptor
+	 * aka element type descriptor
+	 * aka element descriptor
+	 * @typedef {{
+	 *   readonly ns: Namespace;
+	 *   readonly name: Namespace['name'];
+	 *   readonly allTypes: Array<RegisteredTypeDef>;
+	 *   readonly allTypesByName: Record<string, RegisteredTypeDef>;
+	 *   readonly properties: Array<PropertyDescriptor>;
+	 *   readonly propertiesByName: Record<string, PropertyDescriptor>;
+	 *   readonly bodyProperty?: PropertyDescriptor;
+	 *   readonly idProperty?: PropertyDescriptor;
+	 *   readonly $pkg?: RegisteredPackage;
+	 * }} EffectiveDescriptor
+	 */
+
+	/**
+	 * Property descriptor
+	 * @typedef {RegisteredPropertyDef & {
+	 *   localName: Namespace['localName'];
+	 *   inherited?: boolean;
+	 *   definedBy?: RegisteredTypeDef;
+	 * }} PropertyDescriptor
+	 */
+
+	/**
+	 * @typedef {{
+	 *   name: string;
+	 *   isGeneric: true;
+	 *   ns: {
+	 *     prefix: string;
+	 *     localName: string;
+	 *     uri: string;
+	 *   };
+	 * }} AnyTypeDescriptor
+	 */
+
+	/**
 	 * A utility to build element descriptors.
+	 * @class DescriptorBuilder
+	 * @param {Namespace} nameNs
 	 */
 	function DescriptorBuilder(nameNs) {
+
+	  /**
+	   * @private
+	   * @type {Namespace}
+	   */
 	  this.ns = nameNs;
+
+	  /**
+	   * @private
+	   * @type {Namespace['name']}
+	   */
 	  this.name = nameNs.name;
+
+	  /**
+	   * @private
+	   * @type {Array<RegisteredTypeDef>}
+	   */
 	  this.allTypes = [];
-	  this.allTypesByName = {};
+
+	  /**
+	   * @private
+	   * @type {Record<string, RegisteredTypeDef>}
+	   */
+	  this.allTypesByName = Object.create(null);
+
+	  /**
+	   * @private
+	   * @type {Array<PropertyDescriptor>}
+	   */
 	  this.properties = [];
-	  this.propertiesByName = {};
+
+	  /**
+	   * @private
+	   * @type {Record<string, PropertyDescriptor>}
+	   */
+	  this.propertiesByName = Object.create(null);
 	}
 
-
+	/**
+	 * @return {EffectiveDescriptor}
+	 */
 	DescriptorBuilder.prototype.build = function() {
 	  return pick(this, [
 	    'ns',
@@ -8779,7 +9098,7 @@
 	/**
 	 * Add property at given index.
 	 *
-	 * @param {Object} p
+	 * @param {PropertyDescriptor} p
 	 * @param {Number} [idx]
 	 * @param {Boolean} [validate=true]
 	 */
@@ -8801,7 +9120,11 @@
 	  }
 	};
 
-
+	/**
+	 * @param {PropertyDescriptor} oldProperty
+	 * @param {PropertyDescriptor} newProperty
+	 * @param {string} replace
+	 */
 	DescriptorBuilder.prototype.replaceProperty = function(oldProperty, newProperty, replace) {
 	  var oldNameNs = oldProperty.ns;
 
@@ -8851,7 +9174,11 @@
 	  propertiesByName[oldNameNs.name] = propertiesByName[oldNameNs.localName] = newProperty;
 	};
 
-
+	/**
+	 * @param {PropertyDescriptor} p
+	 * @param {string} targetPropertyName
+	 * @param {string} replace
+	 */
 	DescriptorBuilder.prototype.redefineProperty = function(p, targetPropertyName, replace) {
 
 	  var nsPrefix = p.ns.prefix;
@@ -8870,6 +9197,10 @@
 	  delete p.redefines;
 	};
 
+	/**
+	 * @param {PropertyDescriptor} p
+	 * @param {boolean} validate
+	 */
 	DescriptorBuilder.prototype.addNamedProperty = function(p, validate) {
 	  var ns = p.ns,
 	      propsByName = this.propertiesByName;
@@ -8882,6 +9213,9 @@
 	  propsByName[ns.name] = propsByName[ns.localName] = p;
 	};
 
+	/**
+	 * @param {RegisteredPropertyDef} p
+	 */
 	DescriptorBuilder.prototype.removeNamedProperty = function(p) {
 	  var ns = p.ns,
 	      propsByName = this.propertiesByName;
@@ -8890,6 +9224,10 @@
 	  delete propsByName[ns.localName];
 	};
 
+	/**
+	 * @param {PropertyDescriptor} p
+	 * @param {boolean} [validate]
+	 */
 	DescriptorBuilder.prototype.setBodyProperty = function(p, validate) {
 
 	  if (validate && this.bodyProperty) {
@@ -8901,6 +9239,10 @@
 	  this.bodyProperty = p;
 	};
 
+	/**
+	 * @param {PropertyDescriptor} p
+	 * @param {boolean} [validate]
+	 */
 	DescriptorBuilder.prototype.setIdProperty = function(p, validate) {
 
 	  if (validate && this.idProperty) {
@@ -8912,6 +9254,9 @@
 	  this.idProperty = p;
 	};
 
+	/**
+	 * @param {RegisteredTypeDef} typeDescriptor
+	 */
 	DescriptorBuilder.prototype.assertNotTrait = function(typeDescriptor) {
 
 	  const _extends = typeDescriptor.extends || [];
@@ -8923,6 +9268,9 @@
 	  }
 	};
 
+	/**
+	 * @param {PropertyDescriptor} p
+	 */
 	DescriptorBuilder.prototype.assertNotDefined = function(p, name) {
 	  var propertyName = p.name,
 	      definedProperty = this.propertiesByName[propertyName];
@@ -8935,10 +9283,18 @@
 	  }
 	};
 
+	/**
+	 * @param {string} name
+	 * @return {PropertyDescriptor}
+	 */
 	DescriptorBuilder.prototype.hasProperty = function(name) {
 	  return this.propertiesByName[name];
 	};
 
+	/**
+	 * @param {RegisteredTypeDef} t
+	 * @param {boolean} inherited
+	 */
 	DescriptorBuilder.prototype.addTrait = function(t, inherited) {
 
 	  if (inherited) {
@@ -8988,32 +9344,93 @@
 	};
 
 	/**
+	 * @typedef {import('./ns.js').Namespace} Namespace
+	 * @typedef {import('./moddle.js').PackageDefinition} PackageDefinition
+	 * @typedef {import('./moddle.js').TypeDefinition} TypeDefinition
+	 * @typedef {import('./moddle.js').PropertyDefinition} PropertyDefinition
+	 * @typedef {import('./properties.js').default} Properties
+	 * @typedef {import('./descriptor-builder.js').EffectiveDescriptor} EffectiveDescriptor
+	 */
+
+	/**
+	 * Registered package definition
+	 * @typedef {Omit<PackageDefinition, 'types'> & {
+	 *   types?: Array<RegisteredTypeDef>;
+	 * }} RegisteredPackage
+	 */
+
+	/**
+	 * Registered type definition
+	 * @typedef {Omit<TypeDefinition, 'properties'> & {
+	 *   properties?: Array<RegisteredPropertyDef>;
+	 *   propertiesByName?: Record<string, RegisteredPropertyDef>;
+	 *   superClass?: Array<string>;
+	 *   extends?: Array<string>;
+	 *   meta?: Record<string, *>;
+	 *   traits?: Array<string>;
+	 *   ns?: Namespace;
+	 *   readonly $pkg?: RegisteredPackage;
+	 * }} RegisteredTypeDef
+	 */
+
+	/**
+	 * Registered property definition
+	 * @typedef {PropertyDefinition & { ns: Namespace }} RegisteredPropertyDef
+	 */
+
+	/**
 	 * A registry of Moddle packages.
 	 *
-	 * @param {Array<Package>} packages
+	 * @param {Array<PackageDefinition> | Record<string,PackageDefinition>} packages
 	 * @param {Properties} properties
 	 */
 	function Registry(packages, properties) {
-	  this.packageMap = {};
-	  this.typeMap = {};
 
+	  /**
+	   * @private
+	   * @type {Record<string, RegisteredPackage>} registered packages map
+	   */
+	  this.packageMap = Object.create(null);
+
+	  /**
+	   * @type {Record<string,RegisteredTypeDef>}
+	   */
+	  this.typeMap = Object.create(null);
+
+	  /**
+	   * @private
+	   * @type {Array<RegisteredPackage>} all registered packages
+	   */
 	  this.packages = [];
 
+	  /**
+	   * @private
+	   * @type {Properties}
+	   */
 	  this.properties = properties;
 
 	  forEach(packages, bind$1(this.registerPackage, this));
 	}
 
-
+	/**
+	 * @param {string} uriOrPrefix uri or prefix of package
+	 * @return {RegisteredPackage} registered package
+	 */
 	Registry.prototype.getPackage = function(uriOrPrefix) {
 	  return this.packageMap[uriOrPrefix];
 	};
 
+	/**
+	 * @return {Array<RegisteredPackage>} all registered packages
+	 */
 	Registry.prototype.getPackages = function() {
 	  return this.packages;
 	};
 
-
+	/**
+	 * @private
+	 * @param {PackageDefinition} pkg registering package
+	 */
 	Registry.prototype.registerPackage = function(pkg) {
 
 	  // copy package
@@ -9033,22 +9450,23 @@
 	  this.packages.push(pkg);
 	};
 
-
 	/**
+	 * @private
 	 * Register a type from a specific package with us
+	 * @param {TypeDefinition} type
+	 * @param {RegisteredPackage} pkg
 	 */
 	Registry.prototype.registerType = function(type, pkg) {
-
 	  type = assign$1({}, type, {
 	    superClass: (type.superClass || []).slice(),
 	    extends: (type.extends || []).slice(),
 	    properties: (type.properties || []).slice(),
-	    meta: assign$1((type.meta || {}))
+	    meta: assign$1({}, type.meta || {})
 	  });
 
 	  var ns = parseName(type.name, pkg.prefix),
 	      name = ns.name,
-	      propertiesByName = {};
+	      /** @type {Record<string, RegisteredPropertyDef>} */ propertiesByName = Object.create(null);
 
 	  // parse properties
 	  forEach(type.properties, bind$1(function(p) {
@@ -9093,18 +9511,24 @@
 	  this.typeMap[name] = type;
 	};
 
+	/**
+	 * @callback IteratorFn
+	 * @param {RegisteredTypeDef} type
+	 * @param {boolean} inherited
+	 */
 
 	/**
 	 * Traverse the type hierarchy from bottom to top,
 	 * calling iterator with (type, inherited) for all elements in
 	 * the inheritance chain.
-	 *
-	 * @param {Object} nsName
-	 * @param {Function} iterator
+	 * @private
+	 * @param {Namespace} nsName
+	 * @param {IteratorFn} iterator
 	 * @param {Boolean} [trait=false]
 	 */
 	Registry.prototype.mapTypes = function(nsName, iterator, trait) {
 
+	  /** @type {RegisteredTypeDef} */
 	  var type = isBuiltIn(nsName.name) ? { name: nsName.name } : this.typeMap[nsName.name];
 
 	  var self = this;
@@ -9150,13 +9574,10 @@
 	  forEach(type.traits, traverseTrait);
 	};
 
-
 	/**
 	 * Returns the effective descriptor for a type.
-	 *
-	 * @param  {String} type the namespaced name (ns:localName) of the type
-	 *
-	 * @return {Descriptor} the resulting effective descriptor
+	 * @param  {Namespace['name']} name the namespaced name (ns:localName) of the type
+	 * @return {EffectiveDescriptor} the resulting effective descriptor
 	 */
 	Registry.prototype.getEffectiveDescriptor = function(name) {
 
@@ -9176,15 +9597,23 @@
 	  return descriptor;
 	};
 
-
+	/**
+	 * @private
+	 * @param {RegisteredTypeDef | EffectiveDescriptor} target
+	 * @param {RegisteredPackage} pkg
+	 */
 	Registry.prototype.definePackage = function(target, pkg) {
 	  this.properties.define(target, '$pkg', { value: pkg });
 	};
 
-
-
 	// helpers ////////////////////////////
 
+	/**
+	 * Checking already defined packages
+	 * @param {Record<string, RegisteredPackage>} packageMap
+	 * @param {PackageDefinition} pkg
+	 * @param {'prefix' | 'uri'} identifierKey
+	 */
 	function ensureAvailable(packageMap, pkg, identifierKey) {
 
 	  var value = pkg[identifierKey];
@@ -9195,20 +9624,29 @@
 	}
 
 	/**
+	 * @typedef {import('./moddle.js').default} Moddle
+	 * @typedef {import('./descriptor-builder.js').PropertyDescriptor} PropertyDesc
+	 * @typedef {import('./registry.js').EffectiveDescriptor} EffectiveDescriptor
+	 * @typedef {import('./factory.js').ModdleElement} ModdleElement
+	 * @typedef {import('./descriptor-builder.js').AnyTypeDescriptor} AnyTypeDescriptor
+	 */
+
+	/**
 	 * A utility that gets and sets properties of model elements.
 	 *
-	 * @param {Model} model
+	 * @param {Moddle} model
 	 */
 	function Properties(model) {
+
+	  /** @type {Moddle} */
 	  this.model = model;
 	}
-
 
 	/**
 	 * Sets a named property on the target element.
 	 * If the value is undefined, the property gets deleted.
 	 *
-	 * @param {Object} target
+	 * @param {ModdleElement} target
 	 * @param {String} name
 	 * @param {Object} value
 	 */
@@ -9250,7 +9688,7 @@
 	/**
 	 * Returns the named property of the given element
 	 *
-	 * @param  {Object} target
+	 * @param  {ModdleElement} target
 	 * @param  {String} name
 	 *
 	 * @return {Object}
@@ -9273,13 +9711,12 @@
 	  return target[propertyName];
 	};
 
-
 	/**
 	 * Define a property on the target element
-	 *
-	 * @param  {Object} target
+	 * @template [T=any]
+	 * @param  {NonNullable<T>} target
 	 * @param  {String} name
-	 * @param  {Object} options
+	 * @param  {PropertyDescriptor} options
 	 */
 	Properties.prototype.define = function(target, name, options) {
 
@@ -9299,9 +9736,11 @@
 	  Object.defineProperty(target, name, options);
 	};
 
-
 	/**
 	 * Define the descriptor for an element
+	 * @template [T=any]
+	 * @param {NonNullable<T>} target
+	 * @param {EffectiveDescriptor | AnyTypeDescriptor} descriptor
 	 */
 	Properties.prototype.defineDescriptor = function(target, descriptor) {
 	  this.define(target, '$descriptor', { value: descriptor });
@@ -9309,6 +9748,9 @@
 
 	/**
 	 * Define the model for an element
+	 * @template [T=any]
+	 * @param {NonNullable<T>} target
+	 * @param {Moddle} model
 	 */
 	Properties.prototype.defineModel = function(target, model) {
 	  this.define(target, '$model', { value: model });
@@ -9317,10 +9759,10 @@
 	/**
 	 * Return property with the given name on the element.
 	 *
-	 * @param {any} target
+	 * @param {ModdleElement} target
 	 * @param {string} name
 	 *
-	 * @return {object | null} property
+	 * @return {PropertyDesc | null} property
 	 */
 	Properties.prototype.getProperty = function(target, name) {
 
@@ -9369,6 +9811,83 @@
 	  return name.replace(/^:/, '');
 	}
 
+	/**
+	 * @typedef {import('./registry.js').RegisteredTypeDef} RegisteredTypeDef
+	 * @typedef {import('./registry.js').RegisteredPackage} RegisteredPackage
+	 * @typedef {import('./base.js').default} BaseElement
+	 * @typedef {import('./descriptor-builder.js').EffectiveDescriptor} EffectiveDescriptor
+	 * @typedef {import('./descriptor-builder.js').AnyTypeDescriptor} AnyTypeDescriptor
+	 * @typedef {import('./descriptor-builder.js').PropertyDescriptor} PropertyDescriptor
+	 */
+
+	/**
+	 * @template [T=Record<string,any>]
+	 * @typedef {import('./factory.js').ModdleElement<T>} ModdleElement
+	 * @typedef {import('./factory.js').ModdleElementType<T>} ModdleElementType
+	 * @typedef {import('./factory.js').AnyModdleElement<T>} AnyModdleElement
+	 */
+
+	/**
+	 * Package definition
+	 * @typedef {{
+	 *   $schema?: string;
+	 *   name: string;
+	 *   prefix: string;
+	 *   types?: Array<TypeDefinition>;
+	 *   [key: string]: any;
+	 * } & PackageDefinitionXmlExtension} PackageDefinition
+	 */
+
+	/**
+	 * Set of extended parameters for package definition used in moddle-xml.
+	 * @typedef {{
+	 *   uri?: string;
+	 *   xml?: {
+	 *     tagAlias?: 'lowerCase';
+	 *     typePrefix?: string;
+	 *   };
+	 * }} PackageDefinitionXmlExtension
+	 */
+
+	/**
+	 * Type definition in declaration in package
+	 * @typedef {{
+	 *   name: string;
+	 *   isAbstract?: boolean;
+	 *   properties?: Array<PropertyDefinition>;
+	 *   superClass?: Array<string>;
+	 *   extends?: Array<string>;
+	 *   meta?: Record<string, *>;
+	 *   [key: string]: any;
+	 * }} TypeDefinition
+	 */
+
+	/**
+	 * Set of extended parameters for property definition used in moddle-xml.
+	 * @typedef {{
+	 *   isBody?: boolean;
+	 *   isAttr?: boolean;
+	 *   xml?: {
+	 *     serialize?: string;
+	 *   };
+	 * }} PropertyDefinitionXmlExtension
+	 */
+
+	/**
+	 * Property definition of type definition
+	 * @typedef {{
+	 *   name: string;
+	 *   type: 'String' | 'Boolean' | 'Integer' | 'Real' | string;
+	 *   default?: string | boolean | number;
+	 *   isMany?: boolean;
+	 *   isReference?: boolean;
+	 *   isId?: boolean;
+	 *   redefines?: string;
+	 *   replaces?: string;
+	 *   [key: string]: any;
+	 * } & PropertyDefinitionXmlExtension} PropertyDefinition
+	 */
+
 	// Moddle implementation /////////////////////////////////////////////////
 
 	/**
@@ -9378,7 +9897,7 @@
 	 *
 	 * @example
 	 *
-	 * var Moddle = require('moddle');
+	 * import Moddle from 'moddle';
 	 *
 	 * var pkg = {
 	 *   name: 'mypackage',
@@ -9390,22 +9909,30 @@
 	 *
 	 * var moddle = new Moddle([pkg]);
 	 *
-	 * @param {Array<Package>} packages the packages to contain
-	 *
-	 * @param { { strict?: boolean } } [config] moddle configuration
+	 * @param {Array<PackageDefinition> | Record<string,PackageDefinition>} packages the packages to contain
+	 * @param {{ strict?: boolean }} [config={}] moddle configuration
 	 */
 	function Moddle(packages, config = {}) {
 
+	  /** @type Readonly<Properties> */
 	  this.properties = new Properties(this);
 
+	  /** @type Readonly<Factory> */
 	  this.factory = new Factory(this, this.properties);
+
+	  /** @type Readonly<Registry> */
 	  this.registry = new Registry(packages, this.properties);
 
-	  this.typeCache = {};
+	  /**
+	   * @type {Record<string,ModdleElementType>}
+	   */
+	  this.typeCache = Object.create(null);
 
+	  /**
+	   * @type {Readonly<{readonly strict?: boolean}>}
+	   */
 	  this.config = config;
 	}
-
 
 	/**
 	 * Create an instance of the specified type.
@@ -9417,9 +9944,10 @@
 	 * var foo = moddle.create('my:Foo');
 	 * var bar = moddle.create('my:Bar', { id: 'BAR_1' });
 	 *
-	 * @param  {String|Object} descriptor the type descriptor or name know to the model
-	 * @param  {Object} attrs   a number of attributes to initialize the model instance with
-	 * @return {Object}         model instance
+	 * @template [T=Record<string,any>]
+	 * @param  {String|EffectiveDescriptor} descriptor the type descriptor or name know to the model
+	 * @param  {Partial<T>} [attrs] a number of attributes to initialize the model instance with
+	 * @return {ModdleElement<T>} model instance
 	 */
 	Moddle.prototype.create = function(descriptor, attrs) {
 	  var Type = this.getType(descriptor);
@@ -9431,7 +9959,6 @@
 	  return new Type(attrs);
 	};
 
-
 	/**
 	 * Returns the type representing a given descriptor
 	 *
@@ -9442,8 +9969,9 @@
 	 * var Foo = moddle.getType('my:Foo');
 	 * var foo = new Foo({ 'id' : 'FOO_1' });
 	 *
-	 * @param  {String|Object} descriptor the type descriptor or name know to the model
-	 * @return {Object}         the type representing the descriptor
+	 * @template [T=Record<string,any>]
+	 * @param  {String|EffectiveDescriptor} descriptor the type descriptor or name know to the model
+	 * @return {ModdleElementType<T>} the type representing the descriptor
 	 */
 	Moddle.prototype.getType = function(descriptor) {
 
@@ -9460,7 +9988,6 @@
 
 	  return type;
 	};
-
 
 	/**
 	 * Creates an any-element type to be used within model instances.
@@ -9483,16 +10010,17 @@
 	 *
 	 * // go ahead and serialize the stuff
 	 *
-	 *
+	 * @template [T=Record<string, any>]
 	 * @param  {String} name  the name of the element
 	 * @param  {String} nsUri the namespace uri of the element
-	 * @param  {Object} [properties] a map of properties to initialize the instance with
-	 * @return {Object} the any type instance
+	 * @param  {T} [properties] a map of properties to initialize the instance with
+	 * @return {AnyModdleElement<T>} the any type instance
 	 */
 	Moddle.prototype.createAny = function(name, nsUri, properties) {
 
 	  var nameNs = parseName(name);
 
+	  /** @type AnyModdleElement */
 	  var element = {
 	    $type: name,
 	    $instanceOf: function(type) {
@@ -9506,6 +10034,7 @@
 	    }
 	  };
 
+	  /** @type AnyTypeDescriptor */
 	  var descriptor = {
 	    name: name,
 	    isGeneric: true,
@@ -9536,8 +10065,8 @@
 
 	/**
 	 * Returns a registered package by uri or prefix
-	 *
-	 * @return {Object} the package
+	 * @param {string} uriOrPrefix
+	 * @return {RegisteredPackage} the package
 	 */
 	Moddle.prototype.getPackage = function(uriOrPrefix) {
 	  return this.registry.getPackage(uriOrPrefix);
@@ -9546,7 +10075,7 @@
 	/**
 	 * Returns a snapshot of all known packages
 	 *
-	 * @return {Object} the package
+	 * @return {Readonly<Array<RegisteredPackage>>} the package
 	 */
 	Moddle.prototype.getPackages = function() {
 	  return this.registry.getPackages();
@@ -9554,16 +10083,25 @@
 
 	/**
 	 * Returns the descriptor for an element
+	 * @param {ModdleElement | ModdleElementType} element
+	 * @return {EffectiveDescriptor}
 	 */
 	Moddle.prototype.getElementDescriptor = function(element) {
 	  return element.$descriptor;
 	};
 
 	/**
+	 * @overload
 	 * Returns true if the given descriptor or instance
 	 * represents the given type.
-	 *
-	 * May be applied to this, if element is omitted.
+	 * @param {ModdleElement | ModdleElementType} element
+	 * @param {string} type
+	 * @return {boolean}
+	 */
+	/**
+	 * @overload
+	 * @param {string} type
+	 * @return {boolean}
 	 */
 	Moddle.prototype.hasType = function(element, type) {
 	  if (type === undefined) {
@@ -9578,13 +10116,18 @@
 
 	/**
 	 * Returns the descriptor of an elements named property
+	 * @param {ModdleElement | ModdleElementType} element
+	 * @param {string} property
+	 * @return {PropertyDescriptor}
 	 */
 	Moddle.prototype.getPropertyDescriptor = function(element, property) {
 	  return this.getElementDescriptor(element).propertiesByName[property];
 	};
 
 	/**
-	 * Returns a mapped type's descriptor
+	 * Return registered type definition
+	 * @param {string} type
+	 * @return {RegisteredTypeDef}
 	 */
 	Moddle.prototype.getTypeDescriptor = function(type) {
 	  return this.registry.typeMap[type];
@@ -9667,12 +10210,41 @@
 	  };
 	}
 
-	function cloneNsMatrix(nsMatrix) {
-	  var clone = {}, key;
-	  for (key in nsMatrix) {
-	    clone[key] = nsMatrix[key];
+	/**
+	 * Set a namespace matrix entry, recording the previous
+	 * value on the given change log for later restoration.
+	 *
+	 * @param {Object} nsMatrix
+	 * @param {Object<string, ?string>} changes
+	 * @param {string} key
+	 * @param {string} value
+	 */
+	function setNsEntry(nsMatrix, changes, key, value) {
+	  if (!(key in changes)) {
+	    changes[key] = key in nsMatrix ? nsMatrix[key] : null;
 	  }
-	  return clone;
+
+	  nsMatrix[key] = value;
+	}
+
+	/**
+	 * Restore a namespace matrix, applying the given change log.
+	 *
+	 * @param {Object} nsMatrix
+	 * @param {Object<string, ?string>} changes
+	 */
+	function restoreNsMatrix(nsMatrix, changes) {
+	  var key, value;
+
+	  for (key in changes) {
+	    value = changes[key];
+
+	    if (value === null) {
+	      delete nsMatrix[key];
+	    } else {
+	      nsMatrix[key] = value;
+	    }
+	  }
 	}
 
 	function uriPrefix(prefix) {
@@ -9680,7 +10252,7 @@
 	}
 
 	function buildNsMatrix(nsUriToPrefix) {
-	  var nsMatrix = {},
+	  var nsMatrix = Object.create(null),
 	      uri,
 	      prefix;
 
@@ -9729,6 +10301,33 @@
 	  var getContext = noopGetContext;
 
 	  /**
+	   * Are we currently consuming a chunked stream of XML,
+	   * i.e. is a `write` call in progress that may be followed
+	   * by more chunks?
+	   *
+	   * @type {boolean}
+	   */
+	  var streaming = false;
+
+	  /**
+	   * Did we already encounter the root tag?
+	   *
+	   * Persisted across `write` calls so we can detect a missing
+	   * start tag once the stream ends.
+	   *
+	   * @type {boolean}
+	   */
+	  var rootTagFound = false;
+
+	  /**
+	   * Not yet parsed remainder of the previously written chunk,
+	   * i.e. an incomplete token that awaits more input.
+	   *
+	   * @type {string}
+	   */
+	  var leftoverXml = '';
+
+	  /**
 	   * Do we need to parse the current elements attributes for namespaces?
 	   *
 	   * @type {boolean}
@@ -9755,6 +10354,13 @@
 	   * @type {boolean}
 	   */
 	  var parseStop = false;
+
+	  /**
+	   * Namespace + node state shared across (streamed) parse runs.
+	   */
+	  var nsChangesStack,
+	      nsMatrix,
+	      nodeStack;
 
 	  /**
 	   * A map of { uri: prefix } used by the parser.
@@ -9854,7 +10460,7 @@
 	      throw error$2('required args <nsMap={}>');
 	    }
 
-	    var _nsUriToPrefix = {}, k;
+	    var _nsUriToPrefix = Object.create(null), k;
 
 	    for (k in nsMap) {
 	      _nsUriToPrefix[k] = nsMap[k];
@@ -9867,7 +10473,22 @@
 	  };
 
 	  /**
-	   * Parse xml string.
+	   * Reset the parser state before a (streamed) parse run.
+	   */
+	  function resetState() {
+	    nsChangesStack = isNamespace ? [] : null;
+	    nsMatrix = isNamespace ? buildNsMatrix(nsUriToPrefix) : null;
+	    nodeStack = [];
+
+	    getContext = noopGetContext;
+	    parseStop = false;
+	    returnError = null;
+	    rootTagFound = false;
+	    leftoverXml = '';
+	  }
+
+	  /**
+	   * Parse a complete xml string.
 	   *
 	   * @param  {string} xml
 	   *
@@ -9878,10 +10499,68 @@
 	      throw error$2('required args <xml=string>');
 	    }
 
-	    returnError = null;
+	    if (streaming) {
+	      throw error$2('parse during stream; call end() first');
+	    }
+
+	    resetState();
 
 	    parse(xml);
 
+	    getContext = noopGetContext;
+	    parseStop = false;
+
+	    return returnError;
+	  };
+
+	  /**
+	   * Write the next chunk of a streamed xml string.
+	   *
+	   * Parse events are emitted for all complete tokens; an
+	   * incomplete trailing token is buffered until the next
+	   * `write` or, ultimately, reported as an error on `end`.
+	   *
+	   * @param  {string} xml
+	   *
+	   * @return {Parser} self
+	   */
+	  this['write'] = function(xml) {
+	    if (typeof xml !== 'string') {
+	      throw error$2('required args <xml=string>');
+	    }
+
+	    if (!streaming) {
+	      resetState();
+	      streaming = true;
+	    }
+
+	    if (!returnError) {
+	      leftoverXml = parse(leftoverXml + xml, true) || '';
+	    }
+
+	    return this;
+	  };
+
+	  /**
+	   * Finish parsing a streamed xml string, i.e. signal that
+	   * no more chunks will be written.
+	   *
+	   * @return {Error} returnError, if not thrown
+	   */
+	  this['end'] = function() {
+	    if (!streaming) {
+	      resetState();
+	    }
+
+	    // flush the buffered remainder, now treating an incomplete
+	    // trailing token as a hard error
+	    streaming = false;
+
+	    if (!returnError) {
+	      parse(leftoverXml);
+	    }
+
+	    leftoverXml = '';
 	    getContext = noopGetContext;
 	    parseStop = false;
 
@@ -9898,13 +10577,26 @@
 	  /**
 	   * Parse string, invoking configured listeners on element.
 	   *
-	   * @param  {string} xml
+	   * Namespace and node stack state is shared across (streamed)
+	   * invocations via the enclosing parser scope.
+	   *
+	   * Internal note: while `streaming`, an incomplete trailing token
+	   * is not treated as an error but returned so `write` can buffer it
+	   * and prepend it to the next chunk. This buffered remainder is an
+	   * implementation detail of the streaming buffer, not a public API;
+	   * outside of that case the return value is `undefined`.
+	   *
+	   * @param {string} xml
+	   * @param {boolean} streaming
+	   *
+	   * @return {string|undefined} buffered remainder, streaming internal use only
 	   */
-	  function parse(xml) {
-	    var nsMatrixStack = isNamespace ? [] : null,
-	        nsMatrix = isNamespace ? buildNsMatrix(nsUriToPrefix) : null,
-	        _nsMatrix,
-	        nodeStack = [],
+	  function parse(xml, streaming = false) {
+
+	    var elNameCache = null;
+
+	    var nsChanges,
+	        nsSnapshot,
 	        anonymousNsCount = 0,
 	        tagStart = false,
 	        tagEnd = false,
@@ -9922,6 +10614,36 @@
 	        ;
 
 	    /**
+	     * Normalize a namespaced attribute name against the current
+	     * namespace matrix.
+	     *
+	     * @param {string} name
+	     * @param {string|boolean} defaultAlias
+	     *
+	     * @return {string|null} normalized name, or `null` when the prefix
+	     *                       has no namespace (a warning is emitted)
+	     */
+	    function normalizeAttrName(name, defaultAlias) {
+	      var w = name.indexOf(':');
+
+	      if (w === -1) {
+	        return name;
+	      }
+
+	      // normalize ns attribute name
+	      var nsName = nsMatrix[name.substring(0, w)];
+
+	      if (!nsName) {
+	        handleWarning(missingNamespaceForPrefix(name.substring(0, w)));
+	        return null;
+	      }
+
+	      return defaultAlias === nsName
+	        ? name.substr(w + 1)
+	        : nsName + name.substr(w);
+	    }
+
+	    /**
 	     * Parse attributes on demand and returns the parsed attributes.
 	     *
 	     * Return semantics: (1) `false` on attribute parse error,
@@ -9936,19 +10658,17 @@
 
 	      var nsUri,
 	          nsUriPrefix,
-	          nsName,
 	          defaultAlias = isNamespace && nsMatrix['xmlns'],
 	          attrList = isNamespace && maybeNS ? [] : null,
 	          i = attrsStart,
 	          s = attrsString,
 	          l = s.length,
-	          hasNewMatrix,
 	          newalias,
 	          value,
 	          alias,
 	          name,
 	          attrs = {},
-	          seenAttrs = {},
+	          seenAttrs = new Set(),
 	          skipAttr,
 	          w,
 	          j;
@@ -10004,6 +10724,7 @@
 
 	        name = s.substring(i, j);
 
+	        // by definition bound to `xmlns`, must not be declared - https://www.w3.org/TR/xml-names/#ns-decl
 	        if (name === 'xmlns:xmlns') {
 	          handleWarning('illegal declaration of xmlns');
 	          skipAttr = true;
@@ -10061,6 +10782,11 @@
 	          value = s.substring(i, j);
 	        }
 
+	        // namespace fixed, must not be re-declared - https://www.w3.org/TR/xml-names/#ns-decl
+	        if (name === 'xmlns:xml' && value !== 'http://www.w3.org/XML/1998/namespace') {
+	          handleError('illegal value of xmlns:xml');
+	        }
+
 	        i = j;
 
 	        // ensure SPACE follows attribute
@@ -10088,12 +10814,12 @@
 	        }
 
 	        // check attribute re-declaration
-	        if (name in seenAttrs) {
+	        if (seenAttrs.has(name)) {
 	          handleWarning('attribute <' + name + '> already defined');
 	          continue;
 	        }
 
-	        seenAttrs[name] = true;
+	        seenAttrs.add(name);
 
 	        if (!isNamespace) {
 	          attrs[name] = value;
@@ -10137,18 +10863,25 @@
 	            }
 
 	            if (nsMatrix[newalias] !== alias) {
-	              if (!hasNewMatrix) {
-	                nsMatrix = cloneNsMatrix(nsMatrix);
-	                hasNewMatrix = true;
+
+	              // mutate matrix in place, tracking changes
+	              // for restoration once the element closes;
+	              // null prototype guards against special keys
+	              if (!nsChanges) {
+	                nsChanges = Object.create(null);
 	              }
 
-	              nsMatrix[newalias] = alias;
+	              // invalidate cached element names + ns snapshot
+	              elNameCache = null;
+	              nsSnapshot = null;
+
+	              setNsEntry(nsMatrix, nsChanges, newalias, alias);
 	              if (newalias === 'xmlns') {
-	                nsMatrix[uriPrefix(alias)] = nsUri;
+	                setNsEntry(nsMatrix, nsChanges, uriPrefix(alias), nsUri);
 	                defaultAlias = alias;
 	              }
 
-	              nsMatrix[nsUriPrefix] = nsUri;
+	              setNsEntry(nsMatrix, nsChanges, nsUriPrefix, nsUri);
 	            }
 
 	            // expose xmlns(:asd)="..." in attributes
@@ -10165,23 +10898,11 @@
 
 	        // handle attributes on element without
 	        // namespace declarations
-	        w = name.indexOf(':');
-	        if (w === -1) {
-	          attrs[name] = value;
+	        name = normalizeAttrName(name, defaultAlias);
+
+	        if (name === null) {
 	          continue;
 	        }
-
-	        // normalize ns attribute name
-	        if (!(nsName = nsMatrix[name.substring(0, w)])) {
-	          handleWarning(missingNamespaceForPrefix(name.substring(0, w)));
-	          continue;
-	        }
-
-	        name = defaultAlias === nsName
-	          ? name.substr(w + 1)
-	          : nsName + name.substr(w);
-
-	        // end: normalize ns attribute name
 
 	        attrs[name] = value;
 	      }
@@ -10193,24 +10914,11 @@
 	        // normalize captured attributes
 	        for (i = 0, l = attrList.length; i < l; i++) {
 
-	          name = attrList[i++];
+	          name = normalizeAttrName(attrList[i++], defaultAlias);
 	          value = attrList[i];
 
-	          w = name.indexOf(':');
-
-	          if (w !== -1) {
-
-	            // normalize ns attribute name
-	            if (!(nsName = nsMatrix[name.substring(0, w)])) {
-	              handleWarning(missingNamespaceForPrefix(name.substring(0, w)));
-	              continue;
-	            }
-
-	            name = defaultAlias === nsName
-	              ? name.substr(w + 1)
-	              : nsName + name.substr(w);
-
-	            // end: normalize ns attribute name
+	          if (name === null) {
+	            continue;
 	          }
 
 	          attrs[name] = value;
@@ -10296,7 +11004,14 @@
 	        }),
 	        'attrs': getter(getAttrs),
 	        'ns': getter(function() {
-	          return nsMatrix;
+
+	          // expose a stable snapshot of the current namespace
+	          // matrix, cached until the matrix changes
+	          if (!nsSnapshot) {
+	            nsSnapshot = Object.assign(Object.create(null), nsMatrix);
+	          }
+
+	          return nsSnapshot;
 	        })
 	      });
 	    }
@@ -10310,13 +11025,19 @@
 	        i = xml.indexOf('<', j);
 	      }
 
-	      // parse end
+	      // no (more) tags found
 	      if (i === -1) {
+
+	        // buffer the remainder for the next chunk
+	        if (streaming) {
+	          return xml.substring(j);
+	        }
+
 	        if (nodeStack.length) {
 	          return handleError('unexpected end of file');
 	        }
 
-	        if (j === 0) {
+	        if (!rootTagFound) {
 	          return handleError('missing start tag');
 	        }
 
@@ -10327,6 +11048,11 @@
 	        }
 
 	        return;
+	      }
+
+	      // remember that we saw the root tag
+	      if (!rootTagFound) {
+	        rootTagFound = true;
 	      }
 
 	      // parse text
@@ -10361,6 +11087,9 @@
 	        if (q === 91 && xml.substr(i + 3, 6) === 'CDATA[') { // 91 == "["
 	          j = xml.indexOf(']]>', i);
 	          if (j === -1) {
+	            if (streaming) {
+	              return xml.substring(i);
+	            }
 	            return handleError('unclosed cdata');
 	          }
 
@@ -10379,6 +11108,9 @@
 	        if (q === 45 && xml.charCodeAt(i + 3) === 45) { // 45 == "-"
 	          j = xml.indexOf('-->', i);
 	          if (j === -1) {
+	            if (streaming) {
+	              return xml.substring(i);
+	            }
 	            return handleError('unclosed comment');
 	          }
 
@@ -10399,6 +11131,9 @@
 	      if (w === 63) { // "?"
 	        j = xml.indexOf('?>', i);
 	        if (j === -1) {
+	          if (streaming) {
+	            return xml.substring(i);
+	          }
 	          return handleError('unclosed question');
 	        }
 
@@ -10419,6 +11154,9 @@
 	      for (x = i + 1; ; x++) {
 	        v = xml.charCodeAt(x);
 	        if (isNaN(v)) {
+	          if (streaming) {
+	            return xml.substring(i);
+	          }
 	          j = -1;
 	          return handleError('unclosed tag');
 	        }
@@ -10530,15 +11268,11 @@
 
 	      if (isNamespace) {
 
-	        _nsMatrix = nsMatrix;
-
 	        if (tagStart) {
 
-	          // remember old namespace
-	          // unless we're self-closing
-	          if (!tagEnd) {
-	            nsMatrixStack.push(_nsMatrix);
-	          }
+	          // track namespace changes on this element
+	          // for later restoration
+	          nsChanges = null;
 
 	          if (cachedAttrs === null) {
 
@@ -10554,34 +11288,56 @@
 	              maybeNS = false;
 	            }
 	          }
+
+	          // remember changes made by this element
+	          // unless we're self-closing
+	          if (!tagEnd) {
+	            nsChangesStack.push(nsChanges);
+	          }
 	        }
 
 	        _elementName = elementName;
 
-	        w = elementName.indexOf(':');
-	        if (w !== -1) {
-	          xmlns = nsMatrix[elementName.substring(0, w)];
-
-	          // prefix given; namespace must exist
-	          if (!xmlns) {
-	            return handleError('missing namespace on <' + _elementName + '>');
-	          }
-
-	          elementName = elementName.substr(w + 1);
-	        } else {
-	          xmlns = nsMatrix['xmlns'];
-
-	          // if no default namespace is defined,
-	          // we'll import the element as anonymous.
-	          //
-	          // it is up to users to correct that to the document defined
-	          // targetNamespace, or whatever their undersanding of the
-	          // XML spec mandates.
+	        // memoize normalized names per namespace state; tag names
+	        // typically repeat heavily and the matrix rarely changes.
+	        // the cache is rebuilt whenever the matrix changed.
+	        if (elNameCache === null) {
+	          elNameCache = Object.create(null);
 	        }
 
-	        // adjust namespace prefixs as configured
-	        if (xmlns) {
-	          elementName = xmlns + ':' + elementName;
+	        var _cachedName = elNameCache[elementName];
+
+	        if (_cachedName !== undefined) {
+	          elementName = _cachedName;
+	        } else {
+
+	          w = elementName.indexOf(':');
+	          if (w !== -1) {
+	            xmlns = nsMatrix[elementName.substring(0, w)];
+
+	            // prefix given; namespace must exist
+	            if (!xmlns) {
+	              return handleError('missing namespace on <' + _elementName + '>');
+	            }
+
+	            elementName = elementName.substr(w + 1);
+	          } else {
+	            xmlns = nsMatrix['xmlns'];
+
+	            // if no default namespace is defined,
+	            // we'll import the element as anonymous.
+	            //
+	            // it is up to users to correct that to the document defined
+	            // targetNamespace, or whatever their undersanding of the
+	            // XML spec mandates.
+	          }
+
+	          // adjust namespace prefixs as configured
+	          if (xmlns) {
+	            elementName = xmlns + ':' + elementName;
+	          }
+
+	          elNameCache[_elementName] = elementName;
 	        }
 
 	      }
@@ -10617,9 +11373,16 @@
 	        // restore old namespace
 	        if (isNamespace) {
 	          if (!tagStart) {
-	            nsMatrix = nsMatrixStack.pop();
-	          } else {
-	            nsMatrix = _nsMatrix;
+	            nsChanges = nsChangesStack.pop();
+	          }
+
+	          if (nsChanges) {
+	            restoreNsMatrix(nsMatrix, nsChanges);
+	            nsChanges = null;
+
+	            // invalidate cached element names + ns snapshot
+	            elNameCache = null;
+	            nsSnapshot = null;
 	          }
 	        }
 	      }
@@ -11605,10 +12368,48 @@
 	  return this.defaultPrefixMap[prefix];
 	};
 
+	/**
+	 * Return the first truthy `fn(scope)` walking this scope and its ancestors.
+	 *
+	 * @param {(scope: Namespaces) => any} fn
+	 *
+	 * @return {any}
+	 */
+	Namespaces.prototype.resolve = function(fn) {
+
+	  var scope = this;
+
+	  while (scope) {
+	    var resolved = fn(scope);
+
+	    if (resolved) {
+	      return resolved;
+	    }
+
+	    scope = scope.parent;
+	  }
+	};
+
+	/**
+	 * Call `fn(scope)` for this scope and each of its ancestors.
+	 *
+	 * @param {(scope: Namespaces) => void} fn
+	 */
+	Namespaces.prototype.eachScope = function(fn) {
+
+	  var scope = this;
+
+	  while (scope) {
+	    fn(scope);
+
+	    scope = scope.parent;
+	  }
+	};
+
 	Namespaces.prototype.byUri = function(uri) {
-	  return this.uriMap[uri] || (
-	    this.parent && this.parent.byUri(uri)
-	  );
+	  return this.resolve(function(scope) {
+	    return scope.uriMap[uri];
+	  });
 	};
 
 	Namespaces.prototype.add = function(ns, isWellknown) {
@@ -11625,9 +12426,11 @@
 	};
 
 	Namespaces.prototype.uriByPrefix = function(prefix) {
-	  return this.prefixMap[prefix || 'xmlns'] || (
-	    this.parent && this.parent.uriByPrefix(prefix)
-	  );
+	  var key = prefix || 'xmlns';
+
+	  return this.resolve(function(scope) {
+	    return scope.prefixMap[key];
+	  });
 	};
 
 	Namespaces.prototype.mapPrefix = function(prefix, uri) {
@@ -11643,12 +12446,12 @@
 	  var uri = ns.uri;
 	  var nsKey = this.getNSKey(ns);
 
-	  this.used[nsKey] = this.byUri(uri);
+	  // all scopes resolve to the same entry, so resolve once
+	  var resolved = this.byUri(uri);
 
-	  // Inform parent recursively about the usage of this NS
-	  if (this.parent) {
-	    this.parent.logUsed(ns);
-	  }
+	  this.eachScope(function(scope) {
+	    scope.used[nsKey] = resolved;
+	  });
 	};
 
 	Namespaces.prototype.getUsed = function(ns) {
@@ -11865,20 +12668,32 @@
 	}
 
 	ElementSerializer.prototype.build = function(element) {
+	  buildTree(this, element);
+
+	  return this;
+	};
+
+	/**
+	 * Enter the element during the build walk: register its namespaces, tag
+	 * name and attributes, then return the deferred, ordered work to build its
+	 * child nodes (empty when it has none).
+	 *
+	 * @param {Object} element
+	 *
+	 * @return {Array<Object>} ordered, deferred work items to build the children
+	 */
+	ElementSerializer.prototype.enter = function(element) {
 	  this.element = element;
 
 	  var elementDescriptor = element.$descriptor,
 	      propertyDescriptor = this.propertyDescriptor;
 
-	  var otherAttrs,
-	      properties;
-
 	  var isGeneric = elementDescriptor.isGeneric;
 
 	  if (isGeneric) {
-	    otherAttrs = this.parseGenericNsAttributes(element);
+	    this.otherAttrs = this.parseGenericNsAttributes(element);
 	  } else {
-	    otherAttrs = this.parseNsAttributes(element);
+	    this.otherAttrs = this.parseNsAttributes(element);
 	  }
 
 	  if (propertyDescriptor) {
@@ -11887,21 +12702,26 @@
 	    this.ns = this.nsTagName(elementDescriptor);
 	  }
 
-	  // compute tag name
 	  this.tagName = this.addTagName(this.ns);
 
 	  if (isGeneric) {
-	    this.parseGenericContainments(element);
-	  } else {
-	    properties = getSerializableProperties(element);
-
-	    this.parseAttributes(filterAttributes(properties));
-	    this.parseContainments(filterContained(properties));
+	    return this.collectGenericContainments(element);
 	  }
 
-	  this.parseGenericAttributes(element, otherAttrs);
+	  var properties = getSerializableProperties(element);
 
-	  return this;
+	  this.parseAttributes(filterAttributes(properties));
+
+	  return this.collectContainments(filterContained(properties));
+	};
+
+	/**
+	 * Exit the element during the build walk: register its generic attributes,
+	 * which must happen after the children so namespace usage is logged in
+	 * document order.
+	 */
+	ElementSerializer.prototype.exit = function() {
+	  this.parseGenericAttributes(this.element, this.otherAttrs);
 	};
 
 	ElementSerializer.prototype.nsTagName = function(descriptor) {
@@ -11964,20 +12784,34 @@
 	  );
 	};
 
-	ElementSerializer.prototype.parseGenericContainments = function(element) {
-	  var body = element.$body;
+	ElementSerializer.prototype.collectGenericContainments = function(element) {
+	  var self = this,
+	      children = [];
 
-	  if (body) {
-	    this.body.push(new BodySerializer().build({ type: 'String' }, body));
-	  }
+	  var bodyText = element.$body;
 
-	  var children = element.$children;
-
-	  if (children) {
-	    forEach(children, child => {
-	      this.body.push(new ElementSerializer(this).build(child));
+	  if (bodyText) {
+	    children.push({
+	      create: function() {
+	        return new BodySerializer().build({ type: 'String' }, bodyText);
+	      }
 	    });
 	  }
+
+	  var genericChildren = element.$children;
+
+	  if (genericChildren) {
+	    forEach(genericChildren, function(child) {
+	      children.push({
+	        create: function() {
+	          return new ElementSerializer(self);
+	        },
+	        element: child
+	      });
+	    });
+	  }
+
+	  return children;
 	};
 
 	ElementSerializer.prototype.parseNsAttribute = function(element, name, value) {
@@ -12056,7 +12890,6 @@
 	      self.addAttribute(self.nsAttributeName(attr.name), attr.value);
 	    } catch (e) {
 
-	      // eslint-disable-next-line no-undef
 	      typeof console !== 'undefined' && console.warn(
 	        `missing namespace information for <${
           attr.name
@@ -12066,11 +12899,11 @@
 	  });
 	};
 
-	ElementSerializer.prototype.parseContainments = function(properties) {
+	ElementSerializer.prototype.collectContainments = function(properties) {
 
 	  var self = this,
-	      body = this.body,
-	      element = this.element;
+	      element = this.element,
+	      children = [];
 
 	  forEach(properties, function(p) {
 	    var value = element.get(p.name),
@@ -12082,14 +12915,26 @@
 	    }
 
 	    if (p.isBody) {
-	      body.push(new BodySerializer().build(p, value[0]));
+	      children.push({
+	        create: function() {
+	          return new BodySerializer().build(p, value[0]);
+	        }
+	      });
 	    } else if (isSimple(p.type)) {
 	      forEach(value, function(v) {
-	        body.push(new ValueSerializer(self.addTagName(self.nsPropertyTagName(p))).build(p, v));
+	        children.push({
+	          create: function() {
+	            return new ValueSerializer(self.addTagName(self.nsPropertyTagName(p))).build(p, v);
+	          }
+	        });
 	      });
 	    } else if (isReference) {
 	      forEach(value, function(v) {
-	        body.push(new ReferenceSerializer(self.addTagName(self.nsPropertyTagName(p))).build(v));
+	        children.push({
+	          create: function() {
+	            return new ReferenceSerializer(self.addTagName(self.nsPropertyTagName(p))).build(v);
+	          }
+	        });
 	      });
 	    } else {
 
@@ -12098,32 +12943,33 @@
 	      var serialization = getSerialization(p);
 
 	      forEach(value, function(v) {
-	        var serializer;
+	        children.push({
+	          create: function() {
+	            if (serialization) {
+	              if (serialization === SERIALIZE_PROPERTY) {
+	                return new ElementSerializer(self, p);
+	              }
 
-	        if (serialization) {
-	          if (serialization === SERIALIZE_PROPERTY) {
-	            serializer = new ElementSerializer(self, p);
-	          } else {
-	            serializer = new TypeSerializer(self, p, serialization);
-	          }
-	        } else {
-	          serializer = new ElementSerializer(self);
-	        }
+	              return new TypeSerializer(self, p, serialization);
+	            }
 
-	        body.push(serializer.build(v));
+	            return new ElementSerializer(self);
+	          },
+	          element: v
+	        });
 	      });
 	    }
 	  });
+
+	  return children;
 	};
 
 	ElementSerializer.prototype.getNamespaces = function(local) {
 
-	  var namespaces = this.namespaces,
-	      parent = this.parent,
-	      parentNamespaces;
+	  var namespaces = this.namespaces;
 
 	  if (!namespaces) {
-	    parentNamespaces = parent && parent.getNamespaces();
+	    var parentNamespaces = this.getParentNamespaces();
 
 	    if (local || !parentNamespaces) {
 	      this.namespaces = namespaces = new Namespaces(parentNamespaces);
@@ -12133,6 +12979,38 @@
 	  }
 
 	  return namespaces;
+	};
+
+	/**
+	 * Resolve, and memoize, the namespaces scope owned by the closest
+	 * ancestor serializer.
+	 *
+	 * @return {Namespaces|null}
+	 */
+	ElementSerializer.prototype.getParentNamespaces = function() {
+
+	  if (this.parentNamespaces !== undefined) {
+	    return this.parentNamespaces;
+	  }
+
+	  var scope = null,
+	      ancestor = this.parent;
+
+	  while (ancestor) {
+	    if (ancestor.namespaces) {
+	      scope = ancestor.namespaces;
+	      break;
+	    }
+
+	    if (ancestor.parentNamespaces !== undefined) {
+	      scope = ancestor.parentNamespaces;
+	      break;
+	    }
+
+	    ancestor = ancestor.parent;
+	  }
+
+	  return (this.parentNamespaces = scope);
 	};
 
 	ElementSerializer.prototype.logNamespace = function(ns, wellknown, local) {
@@ -12283,40 +13161,77 @@
 	};
 
 	ElementSerializer.prototype.serializeTo = function(writer) {
-	  var firstBody = this.body[0],
-	      indent = firstBody && firstBody.constructor !== BodySerializer;
+	  serializeTree(this, writer);
+	};
 
-	  writer
-	    .appendIndent()
-	    .append('<' + this.tagName);
+	/**
+	 * Serialize the serializer tree rooted at the given element serializer to
+	 * the writer, using an explicit stack to stay flat for nested documents.
+	 *
+	 * @param {ElementSerializer} root
+	 * @param {Object} writer
+	 */
+	function serializeTree(root, writer) {
 
-	  this.serializeAttributes(writer);
+	  var stack = [ { serializer: root, index: 0, opened: false, indent: false } ];
 
-	  writer.append(firstBody ? '>' : ' />');
+	  while (stack.length) {
+	    var frame = stack[stack.length - 1],
+	        serializer = frame.serializer;
 
-	  if (firstBody) {
+	    if (!frame.opened) {
+	      var firstBody = serializer.body[0];
 
-	    if (indent) {
+	      frame.indent = firstBody && firstBody.constructor !== BodySerializer;
+
 	      writer
-	        .appendNewLine()
-	        .indent();
+	        .appendIndent()
+	        .append('<' + serializer.tagName);
+
+	      serializer.serializeAttributes(writer);
+
+	      writer.append(firstBody ? '>' : ' />');
+
+	      frame.opened = true;
+
+	      if (!firstBody) {
+	        writer.appendNewLine();
+	        stack.pop();
+	        continue;
+	      }
+
+	      if (frame.indent) {
+	        writer
+	          .appendNewLine()
+	          .indent();
+	      }
 	    }
 
-	    forEach(this.body, function(b) {
-	      b.serializeTo(writer);
-	    });
+	    if (frame.index < serializer.body.length) {
+	      var child = serializer.body[frame.index++];
 
-	    if (indent) {
+	      if (child instanceof ElementSerializer) {
+	        stack.push({ serializer: child, index: 0, opened: false, indent: false });
+	      } else {
+	        child.serializeTo(writer);
+	      }
+
+	      continue;
+	    }
+
+	    if (frame.indent) {
 	      writer
 	        .unindent()
 	        .appendIndent();
 	    }
 
-	    writer.append('</' + this.tagName + '>');
-	  }
+	    writer
+	      .append('</' + serializer.tagName + '>')
+	      .appendNewLine();
 
-	  writer.appendNewLine();
-	};
+	    stack.pop();
+	  }
+	}
 
 	/**
 	 * A serializer for types that handles serialization of data types
@@ -12447,6 +13362,51 @@
 
 
 	// helpers ///////////
+
+	/**
+	 * Build the serializer tree for the given root element, iterating an
+	 * explicit stack rather than recursing so deeply nested documents stay
+	 * flat.
+	 *
+	 * Elements are visited pre-order so namespaces register in document order:
+	 * `enter` opens an element and returns its children, `exit` runs once its
+	 * subtree is built.
+	 *
+	 * @param {ElementSerializer} rootSerializer
+	 * @param {Object} rootElement
+	 */
+	function buildTree(rootSerializer, rootElement) {
+
+	  var stack = [ {
+	    serializer: rootSerializer,
+	    children: rootSerializer.enter(rootElement),
+	    index: 0
+	  } ];
+
+	  while (stack.length) {
+	    var frame = stack[stack.length - 1];
+
+	    if (frame.index >= frame.children.length) {
+	      frame.serializer.exit();
+	      stack.pop();
+	      continue;
+	    }
+
+	    var child = frame.children[frame.index++];
+
+	    var childSerializer = child.create();
+
+	    frame.serializer.body.push(childSerializer);
+
+	    if (child.element) {
+	      stack.push({
+	        serializer: childSerializer,
+	        children: childSerializer.enter(child.element),
+	        index: 0
+	      });
+	    }
+	  }
+	}
 
 	/**
 	 * @param {Moddle} model
@@ -16234,33 +17194,6 @@
 	 * @typedef {import('../model/Types').ModdleElement} ModdleElement
 	 */
 
-
-	// TODO(nikku): remove with future bpmn-js version
-
-	var DI_ERROR_MESSAGE = 'Tried to access di from the businessObject. The di is available through the diagram element only. For more information, see https://github.com/bpmn-io/bpmn-js/issues/1472';
-
-	/**
-	 * @private
-	 *
-	 * @param {ModdleElement} businessObject
-	 */
-	function ensureCompatDiRef(businessObject) {
-
-	  // bpmnElement can have multiple independent DIs
-	  if (!has(businessObject, 'di')) {
-	    Object.defineProperty(businessObject, 'di', {
-	      enumerable: false,
-	      get: function() {
-	        throw new Error(DI_ERROR_MESSAGE);
-	      }
-	    });
-	  }
-	}
-
-	/**
-	 * @typedef {import('../model/Types').ModdleElement} ModdleElement
-	 */
-
 	/**
 	 * Returns true if an element is of the given meta-model type.
 	 *
@@ -16369,8 +17302,6 @@
 	        );
 	      } else {
 	        diMap[bpmnElement.id] = di;
-
-	        ensureCompatDiRef(bpmnElement);
 	      }
 	    } else {
 	      logError(
@@ -17063,6 +17994,23 @@
 	 */
 
 	/**
+	 * Padding added around the diagram bounds on SVG export.
+	 *
+	 * `getBBox` returns the geometry bounds only, excluding element strokes, so
+	 * without padding strokes at the diagram edges get clipped. Historically this
+	 * padding was provided implicitly by element outlines, which diagram-js now
+	 * creates lazily (diagram-js@15.19, bpmn-io/diagram-js#1064).
+	 */
+	const EXPORT_PADDING = 5;
+
+	/**
+	 * Class set on the canvas container to hide element outlines, which diagram-js
+	 * excludes from rendering while present. Applied when measuring the export
+	 * bounds so lazily created outlines do not skew them.
+	 */
+	const OUTLINE_HIDDEN_CLS = 'djs-outline-hidden';
+
+	/**
 	 * @template T
 	 *
 	 * @typedef { import('diagram-js/lib/core/EventBus').default<T> } EventBus
@@ -17197,7 +18145,7 @@
 	  /* </project-logo> */
 	}
 
-	e$2(BaseViewer, Diagram);
+	e$3(BaseViewer, Diagram);
 
 	/**
 	 * Parse and render a BPMN 2.0 diagram.
@@ -17526,15 +18474,31 @@
 	    const contents = innerSVG(contentNode),
 	          defs = defsNode ? '<defs>' + innerSVG(defsNode) + '</defs>' : '';
 
-	    const bbox = contentNode.getBBox();
+	    // hide outlines so they do not skew the measured bounds
+	    const container = canvas.getContainer();
+
+	    classes$1(container).add(OUTLINE_HIDDEN_CLS);
+
+	    let bbox;
+
+	    try {
+	      bbox = contentNode.getBBox();
+	    } finally {
+	      classes$1(container).remove(OUTLINE_HIDDEN_CLS);
+	    }
+
+	    const x = bbox.x - EXPORT_PADDING,
+	          y = bbox.y - EXPORT_PADDING,
+	          width = bbox.width + EXPORT_PADDING * 2,
+	          height = bbox.height + EXPORT_PADDING * 2;
 
 	    svg =
 	      '<?xml version="1.0" encoding="utf-8"?>\n' +
 	      '<!-- created with bpmn-js / http://bpmn.io -->\n' +
 	      '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n' +
 	      '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ' +
-	      'width="' + bbox.width + '" height="' + bbox.height + '" ' +
-	      'viewBox="' + bbox.x + ' ' + bbox.y + ' ' + bbox.width + ' ' + bbox.height + '" version="1.1">' +
+	      'width="' + width + '" height="' + height + '" ' +
+	      'viewBox="' + x + ' ' + y + ' ' + width + ' ' + height + '" version="1.1">' +
 	      defs + contents +
 	      '</svg>';
 	  } catch (e) {
@@ -17785,7 +18749,7 @@
 	 */
 	BaseViewer.prototype._createContainer = function(options) {
 
-	  const container = domify('<div class="bjs-container"></div>');
+	  const container = domify('<div class="bjs-container bio-theme-parent"></div>');
 
 	  assign(container, {
 	    width: ensureUnit(options.width),
@@ -17940,7 +18904,7 @@
 	  }, this);
 	}
 
-	e$2(BaseModeler, BaseViewer);
+	e$3(BaseModeler, BaseViewer);
 
 
 	/**
@@ -18403,7 +19367,7 @@
 	function collectElementsAnnotations(elements) {
 	  const result = new Map();
 
-	  forEach(selfAndChildren(elements, true), (element) => {
+	  forEach(selfAndChildren(elements), (element) => {
 	    forEach(getElementAnnotations(element), (entry) => {
 	      if (!result.has(entry.annotation)) {
 	        result.set(entry.annotation, { annotation: entry.annotation, associations: [] });
@@ -20076,7 +21040,7 @@
 
 	      drawPath(parentGfx, arrowPathData, {
 	        strokeWidth: 1,
-	        fill: getFillColor(element, defaultFillColor, attrs.fill),
+	        fill: getStrokeColor$1(element, defaultStrokeColor, attrs.stroke),
 	        stroke: getStrokeColor$1(element, defaultStrokeColor, attrs.stroke)
 	      });
 
@@ -20891,7 +21855,7 @@
 	}
 
 
-	e$2(BpmnRenderer, BaseRenderer);
+	e$3(BpmnRenderer, BaseRenderer);
 
 	BpmnRenderer.$inject = [
 	  'config.bpmnRenderer',
@@ -20993,7 +21957,7 @@
 	}
 
 	/**
-	 * @typedef {import('../util/Types').Dimensions} Dimensions
+	 * @typedef {import('./Types.js').Dimensions} Dimensions
 	 *
 	 * @typedef { {
 	 *   top: number;
@@ -21143,7 +22107,7 @@
 	 * @param {string} text
 	 * @param {Record<string, number | string>} style
 	 *
-	 * @return {import('../util/Types').Dimensions}
+	 * @return {import('./Types.js').Dimensions}
 	 */
 	function getTextBBox(text, style) {
 	  var ctx = getCanvasContext();
@@ -21198,7 +22162,7 @@
 	    textBBox.width = fitLine ? textBBox.width : 0;
 
 	    // try to fit
-	    if (fitLine === ' ' || fitLine === '' || textBBox.width < Math.round(maxWidth) || fitLine.length < 2) {
+	    if (fitLine === ' ' || fitLine === '' || textBBox.width <= maxWidth || fitLine.length < 2) {
 	      return fit(lines, fitLine, originalLine, textBBox);
 	    }
 
@@ -22514,16 +23478,16 @@
 	};
 
 	// document wide unique overlay ids
-	var ids$1 = new IdGenerator('ov');
+	var ids$2 = new IdGenerator('ov');
 
-	var LOW_PRIORITY$q = 500;
+	var LOW_PRIORITY$s = 500;
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/ElementRegistry').default} ElementRegistry
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 *
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../model/Types.js').Element} Element
 	 *
 	 * @typedef { {
 	 *   minZoom?: number,
@@ -22646,7 +23610,7 @@
 	  this._canvas = canvas;
 	  this._elementRegistry = elementRegistry;
 
-	  this._ids = ids$1;
+	  this._ids = ids$2;
 
 	  /**
 	   * @type {OverlaysConfigDefault}
@@ -23146,7 +24110,7 @@
 
 	  // move integration
 
-	  eventBus.on('element.changed', LOW_PRIORITY$q, function(e) {
+	  eventBus.on('element.changed', LOW_PRIORITY$s, function(e) {
 	    var element = e.element;
 
 	    var container = self._getOverlayContainer(element, true);
@@ -23232,10 +24196,10 @@
 	};
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/ElementRegistry').default} ElementRegistry
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../../core/GraphicsFactory').default} GraphicsFactory
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../../core/GraphicsFactory.js').default} GraphicsFactory
 	 */
 
 	/**
@@ -23311,9 +24275,9 @@
 	};
 
 	/**
-	 * @typedef {import('../core/Types').ElementLike} ElementLike
-	 * @typedef {import('../core/EventBus').default} EventBus
-	 * @typedef {import('./CommandStack').CommandContext} CommandContext
+	 * @typedef {import('../core/Types.js').ElementLike} ElementLike
+	 * @typedef {import('../core/EventBus.js').default} EventBus
+	 * @typedef {import('./CommandStack.js').CommandContext} CommandContext
 	 *
 	 * @typedef {string|string[]} Events
 	 * @typedef { (context: CommandContext) => ElementLike[] | void } HandlerFunction
@@ -23556,7 +24520,7 @@
 	/**
 	 * @typedef {import('didi').Injector} Injector
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
 	 */
 
 	/**
@@ -23589,7 +24553,7 @@
 	  });
 	}
 
-	e$2(RootElementsBehavior, CommandInterceptor);
+	e$3(RootElementsBehavior, CommandInterceptor);
 
 	RootElementsBehavior.$inject = [ 'canvas', 'injector' ];
 
@@ -23776,14 +24740,7 @@
 	        return [];
 	      }
 
-	      var title = escapeHTML(parent.name || parent.id);
-	      var link = domify('<li><span class="bjs-crumb"><a title="' + title + '">' + title + '</a></span></li>');
-
-	      link.addEventListener('click', function() {
-	        canvas.setRootElement(parentPlane);
-	      });
-
-	      return link;
+	      return [ { parent: parent, parentPlane: parentPlane } ];
 	    });
 
 	    breadcrumbs.innerHTML = '';
@@ -23793,8 +24750,39 @@
 
 	    containerClasses.toggle(OPEN_CLASS, visible);
 
-	    path.forEach(function(element) {
-	      breadcrumbs.appendChild(element);
+	    path.forEach(function(entry, index) {
+	      var parent = entry.parent,
+	          parentPlane = entry.parentPlane,
+	          title = escapeHTML(parent.name || parent.id);
+
+	      // the last crumb represents the current plane; render it as
+	      // plain, non-interactive text
+	      var isCurrent = index === path.length - 1;
+
+	      var crumb;
+
+	      if (isCurrent) {
+	        crumb = domify(
+	          '<li><span class="bjs-crumb" title="' + title + '">' + title + '</span></li>'
+	        );
+	      } else {
+
+	        // render navigable crumbs as local links so they are focusable
+	        // and keyboard-operable
+	        var href = '#' + escapeHTML(parent.id);
+
+	        crumb = domify(
+	          '<li><a class="bjs-crumb" href="' + href + '" title="' + title + '">' + title + '</a></li>'
+	        );
+
+	        crumb.addEventListener('click', function(event) {
+	          event.preventDefault();
+
+	          canvas.setRootElement(parentPlane);
+	        });
+	      }
+
+	      breadcrumbs.appendChild(crumb);
 	    });
 	  }
 
@@ -24228,7 +25216,7 @@
 	 * @typedef {import('../../model/Types').Shape} Shape
 	 */
 
-	var LOW_PRIORITY$p = 250;
+	var LOW_PRIORITY$r = 250;
 	var ARROW_DOWN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.81801948,3.50735931 L10.4996894,9.1896894 L10.5,4 L12,4 L12,12 L4,12 L4,10.5 L9.6896894,10.4996894 L3.75735931,4.56801948 C3.46446609,4.27512627 3.46446609,3.80025253 3.75735931,3.50735931 C4.05025253,3.21446609 4.52512627,3.21446609 4.81801948,3.50735931 Z"/></svg>';
 
 	var EMPTY_MARKER = 'bjs-drilldown-empty';
@@ -24253,7 +25241,7 @@
 
 	  var self = this;
 
-	  this.executed('shape.toggleCollapse', LOW_PRIORITY$p, function(context) {
+	  this.executed('shape.toggleCollapse', LOW_PRIORITY$r, function(context) {
 	    var shape = context.shape;
 
 	    // Add overlay to the collapsed shape
@@ -24265,7 +25253,7 @@
 	  }, true);
 
 
-	  this.reverted('shape.toggleCollapse', LOW_PRIORITY$p, function(context) {
+	  this.reverted('shape.toggleCollapse', LOW_PRIORITY$r, function(context) {
 	    var shape = context.shape;
 
 	    // Add overlay to the collapsed shape
@@ -24277,7 +25265,7 @@
 	  }, true);
 
 
-	  this.executed([ 'shape.create', 'shape.move', 'shape.delete' ], LOW_PRIORITY$p,
+	  this.executed([ 'shape.create', 'shape.move', 'shape.delete' ], LOW_PRIORITY$r,
 	    function(context) {
 	      var oldParent = context.oldParent,
 	          newParent = context.newParent || context.parent,
@@ -24294,7 +25282,7 @@
 	    }, true);
 
 
-	  this.reverted([ 'shape.create', 'shape.move', 'shape.delete' ], LOW_PRIORITY$p,
+	  this.reverted([ 'shape.create', 'shape.move', 'shape.delete' ], LOW_PRIORITY$r,
 	    function(context) {
 	      var oldParent = context.oldParent,
 	          newParent = context.newParent || context.parent,
@@ -24321,7 +25309,7 @@
 
 	}
 
-	e$2(DrilldownOverlayBehavior, CommandInterceptor);
+	e$3(DrilldownOverlayBehavior, CommandInterceptor);
 
 	/**
 	 * @param {Shape} shape
@@ -24439,7 +25427,7 @@
 	};
 
 	/**
-	 * @typedef {import('../util/Types').Point} Point
+	 * @typedef {import('./Types.js').Point} Point
 	 */
 
 	function __stopPropagation(event) {
@@ -24451,7 +25439,7 @@
 	}
 
 	/**
-	 * @param {import('../core/EventBus').Event} event
+	 * @param {import('../core/EventBus.js').Event} event
 	 *
 	 * @return {Event}
 	 */
@@ -24460,7 +25448,7 @@
 	}
 
 	/**
-	 * @param {Event|import('../core/EventBus').Event} event
+	 * @param {Event|import('../core/EventBus.js').Event} event
 	 */
 	function stopPropagation$1(event) {
 	  __stopPropagation(event);
@@ -24556,13 +25544,13 @@
 	}
 
 	/**
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../model/Types.js').Element} Element
 	 *
-	 * @typedef {import('../../core/ElementRegistry').default} ElementRegistry
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../../draw/Styles').default} Styles
+	 * @typedef {import('../../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../../draw/Styles.js').default} Styles
 	 *
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 */
 
 	function allowAll(event) { return true; }
@@ -24571,7 +25559,7 @@
 	  return isPrimaryButton(event) || isAuxiliaryButton(event);
 	}
 
-	var LOW_PRIORITY$o = 500;
+	var LOW_PRIORITY$q = 500;
 
 
 	/**
@@ -24768,7 +25756,7 @@
 	  eventBus.on([
 	    'shape.changed',
 	    'connection.changed'
-	  ], LOW_PRIORITY$o, function(event) {
+	  ], LOW_PRIORITY$q, function(event) {
 
 	    var element = event.element,
 	        gfx = event.gfx;
@@ -24776,7 +25764,7 @@
 	    eventBus.fire('interactionEvents.updateHit', { element: element, gfx: gfx });
 	  });
 
-	  eventBus.on('interactionEvents.createHit', LOW_PRIORITY$o, function(event) {
+	  eventBus.on('interactionEvents.createHit', LOW_PRIORITY$q, function(event) {
 	    var element = event.element,
 	        gfx = event.gfx;
 
@@ -25057,8 +26045,8 @@
 	};
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 */
 
 	/**
@@ -25074,9 +26062,9 @@
 	  this._canvas = canvas;
 
 	  /**
-	   * @type {Object[]}
+	   * @type {Set<Object>}
 	   */
-	  this._selectedElements = [];
+	  this._selectedElements = new Set();
 
 	  var self = this;
 
@@ -25098,17 +26086,18 @@
 	 * @param {Object} element The element to deselect.
 	 */
 	Selection.prototype.deselect = function(element) {
-	  var selectedElements = this._selectedElements;
-
-	  var idx = selectedElements.indexOf(element);
-
-	  if (idx !== -1) {
-	    var oldSelection = selectedElements.slice();
-
-	    selectedElements.splice(idx, 1);
-
-	    this._eventBus.fire('selection.changed', { oldSelection: oldSelection, newSelection: selectedElements });
+	  if (!this._selectedElements.has(element)) {
+	    return;
 	  }
+
+	  var oldSelection = this.get();
+
+	  this._selectedElements.delete(element);
+
+	  this._eventBus.fire('selection.changed', {
+	    oldSelection: oldSelection,
+	    newSelection: this.get()
+	  });
 	};
 
 	/**
@@ -25117,7 +26106,7 @@
 	 * @return {Object[]} The selected elements.
 	 */
 	Selection.prototype.get = function() {
-	  return this._selectedElements;
+	  return Array.from(this._selectedElements);
 	};
 
 	/**
@@ -25128,7 +26117,7 @@
 	 * @return {boolean} Whether the element is selected.
 	 */
 	Selection.prototype.isSelected = function(element) {
-	  return this._selectedElements.indexOf(element) !== -1;
+	  return this._selectedElements.has(element);
 	};
 
 
@@ -25140,8 +26129,7 @@
 	 * Defaults to `false`.
 	 */
 	Selection.prototype.select = function(elements, add) {
-	  var selectedElements = this._selectedElements,
-	      oldSelection = selectedElements.slice();
+	  var oldSelection = this.get();
 
 	  if (!isArray$2(elements)) {
 	    elements = elements ? [ elements ] : [];
@@ -25160,25 +26148,22 @@
 	  // selection may be cleared by passing an empty array or null
 	  // to the method
 	  if (add) {
-	    forEach(elements, function(element) {
-	      if (selectedElements.indexOf(element) !== -1) {
-
-	        // already selected
-	        return;
-	      } else {
-	        selectedElements.push(element);
-	      }
+	    forEach(elements, element => {
+	      this._selectedElements.add(element);
 	    });
 	  } else {
-	    this._selectedElements = selectedElements = elements.slice();
+	    this._selectedElements = new Set(elements);
 	  }
 
-	  this._eventBus.fire('selection.changed', { oldSelection: oldSelection, newSelection: selectedElements });
+	  this._eventBus.fire('selection.changed', {
+	    oldSelection: oldSelection,
+	    newSelection: this.get()
+	  });
 	};
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 */
 
 	var MARKER_HOVER = 'hover',
@@ -25224,20 +26209,20 @@
 	      addMarker(s, MARKER_SELECTED$1);
 	    }
 
-	    var oldSelection = event.oldSelection,
-	        newSelection = event.newSelection;
+	    var oldSelection = new Set(event.oldSelection),
+	        newSelection = new Set(event.newSelection);
 
-	    forEach(oldSelection, function(e) {
-	      if (newSelection.indexOf(e) === -1) {
+	    for (let e of oldSelection) {
+	      if (!newSelection.has(e)) {
 	        deselect(e);
 	      }
-	    });
+	    }
 
-	    forEach(newSelection, function(e) {
-	      if (oldSelection.indexOf(e) === -1) {
+	    for (let e of newSelection) {
+	      if (!oldSelection.has(e)) {
 	        select(e);
 	      }
-	    });
+	    }
 	  });
 	}
 
@@ -25247,10 +26232,10 @@
 	];
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/ElementRegistry').default} ElementRegistry
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('./Selection').default} Selection
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('./Selection.js').default} Selection
 	 */
 
 	/**
@@ -25431,7 +26416,7 @@
 	  BaseViewer.call(this, options);
 	}
 
-	e$2(Viewer, BaseViewer);
+	e$3(Viewer, BaseViewer);
 
 	// modules the viewer is composed of
 	Viewer.prototype._modules = [
@@ -25444,6 +26429,99 @@
 
 	// default moddle extensions the viewer is composed of
 	Viewer.prototype._moddleExtensions = {};
+
+	var UPDATE_DEBOUNCE_INTERVAL = 300;
+
+	/**
+	 * Keeps the current selection visible when the canvas container is resized,
+	 * provided the selection was already visible before the resize. If the selection
+	 * was out of view, this is a no-op.
+	 *
+	 * @param {import('../../core/EventBus').default} eventBus
+	 * @param {import('../../core/Canvas').default} canvas
+	 * @param {import('../selection/Selection').default} selection
+	 */
+	function KeepSelectionVisible(eventBus, canvas, selection) {
+
+	  this._selectionWasVisible = false;
+
+	  // canvas viewbox computation used to determine selection visibility
+	  // is a potentially expensive activity. Hence we debounce it to prevent
+	  // unnecessary computation. The side-effect is that this happens outside
+	  // of the current update cycle - a good thing.
+	  const updateSelectionVisible = debounce(() => {
+	    this._selectionWasVisible = isSelectionVisible();
+	  }, UPDATE_DEBOUNCE_INTERVAL);
+
+	  eventBus.on('canvas.viewbox.changed', updateSelectionVisible);
+	  eventBus.on('selection.changed', updateSelectionVisible);
+
+	  // a pending update would compute the viewbox of a torn down canvas
+	  eventBus.on('diagram.destroy', () => {
+	    updateSelectionVisible.cancel();
+	  });
+
+	  eventBus.on('canvas.resized', () => {
+	    var selected = selection.get();
+
+	    if (!selected.length) {
+	      return;
+	    }
+
+	    if (!this._selectionWasVisible) {
+	      return;
+	    }
+
+	    if (isSelectionVisible()) {
+	      return;
+	    }
+
+	    var currentRoot = canvas.getRootElement();
+
+	    // we ensure that selection scrolling always happens on the current root
+	    // (no root switch happens)
+	    canvas.scrollToElement(selected.concat(currentRoot));
+	  });
+
+	  function isSelectionVisible() {
+	    var selected = selection.get();
+
+	    if (!selected.length) {
+	      return false;
+	    }
+
+	    var selectionBBox = getBBox(selected);
+	    var viewbox = canvas.viewbox();
+
+	    var elementTrbl = asTRBL(selectionBBox);
+	    var viewboxTrbl = asTRBL(viewbox);
+
+	    return elementTrbl.left >= viewboxTrbl.left &&
+	           elementTrbl.right <= viewboxTrbl.right &&
+	           elementTrbl.top >= viewboxTrbl.top &&
+	           elementTrbl.bottom <= viewboxTrbl.bottom;
+	  }
+
+	  // @ts-ignore - test helper - flush internal state
+	  this._flush = updateSelectionVisible.flush;
+	}
+
+	KeepSelectionVisible.$inject = [
+	  'eventBus',
+	  'canvas',
+	  'selection'
+	];
+
+	/**
+	 * @type { import('didi').ModuleDeclaration }
+	 */
+	var KeepSelectionVisibleModule = {
+	  __init__: [ 'keepSelectionVisible' ],
+	  __depends__: [
+	    SelectionModule
+	  ],
+	  keepSelectionVisible: [ 'type', KeepSelectionVisible ]
+	};
 
 	var KEYS_COPY = [ 'c', 'C' ];
 	var KEYS_PASTE = [ 'v', 'V' ];
@@ -25478,6 +26556,13 @@
 	/**
 	 * Checks if key pressed is one of provided keys.
 	 *
+	 * Keys are matched against the logical key (`KeyboardEvent#key`) first,
+	 * respecting Latin keyboard layouts such as QWERTZ or AZERTY.
+	 *
+	 * If a non-Latin layout (e.g. Cyrillic, Arabic) is active, letter keys
+	 * are matched by their physical location (`KeyboardEvent#code`), assuming
+	 * a US (QWERTY) layout. This applies to shortcuts with and without modifiers.
+	 *
 	 * @param {string|string[]} keys
 	 * @param {KeyboardEvent} event
 	 * @return {boolean}
@@ -25485,7 +26570,51 @@
 	function isKey(keys, event) {
 	  keys = isArray$2(keys) ? keys : [ keys ];
 
-	  return keys.indexOf(event.key) !== -1 || keys.indexOf(event.code) !== -1;
+	  return (
+	    keys.indexOf(event.key) !== -1 ||
+	    keys.indexOf(event.code) !== -1 ||
+	    keys.indexOf(getPhysicalLetter(event)) !== -1
+	  );
+	}
+
+	// letters of a specific, non-Latin script; excludes letters shared with Latin
+	// orthographies, e.g. U+02BC (ʼ) or U+02BB (ʻ)
+	var NON_LATIN_LETTER = /^(?!\p{Script_Extensions=Latin}|\p{Script=Common})\p{Letter}$/u;
+
+	var NON_LETTER = /^\P{Letter}$/u;
+
+	/**
+	 * Returns the (US layout) letter of the physical key pressed,
+	 * if the logical key is a non-Latin letter.
+	 *
+	 * With <Shift>, some non-Latin layouts (e.g. Arabic) produce symbols on letter
+	 * keys. As a symbol does not reveal the layout, we additionally require the
+	 * legacy `KeyboardEvent#keyCode` to agree: the operating system maps it to the
+	 * US letter on non-Latin layouts only, but not on Latin ones (e.g. Dvorak).
+	 *
+	 * @param {KeyboardEvent} event
+	 *
+	 * @return {string|null}
+	 */
+	function getPhysicalLetter(event) {
+	  var key = event.key,
+	      match = /^Key([A-Z])$/.exec(event.code || '');
+
+	  if (!match || typeof key !== 'string') {
+	    return null;
+	  }
+
+	  var letter = match[1];
+
+	  if (NON_LATIN_LETTER.test(key)) {
+	    return event.shiftKey ? letter : letter.toLowerCase();
+	  }
+
+	  if (event.shiftKey && NON_LETTER.test(key) && event.keyCode === letter.charCodeAt(0)) {
+	    return letter;
+	  }
+
+	  return null;
 	}
 
 	/**
@@ -25542,7 +26671,7 @@
 	}
 
 	/**
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 *
 	 * @typedef {({ keyEvent: KeyboardEvent }) => any} Listener
 	 */
@@ -25742,7 +26871,7 @@
 	Keyboard.prototype.isShift = isShift;
 	Keyboard.prototype.isKey = isKey;
 
-	var LOW_PRIORITY$n = 500;
+	var LOW_PRIORITY$p = 500;
 
 
 	/**
@@ -25758,7 +26887,7 @@
 
 	  var self = this;
 
-	  eventBus.on('editorActions.init', LOW_PRIORITY$n, function(event) {
+	  eventBus.on('editorActions.init', LOW_PRIORITY$p, function(event) {
 
 	    var editorActions = event.editorActions;
 
@@ -25883,7 +27012,7 @@
 
 	    // quirk: it has to be triggered by `=` as well to work on international keyboard layout
 	    // cf: https://github.com/bpmn-io/bpmn-js/issues/1362#issuecomment-722989754
-	    if (isKey([ '+', 'Add', '=' ], event) && isCmd(event)) {
+	    if (isKey([ '+', '=' ], event) && isCmd(event)) {
 	      editorActions.trigger('stepZoom', { value: 1 });
 
 	      return true;
@@ -25896,7 +27025,7 @@
 
 	    var event = context.keyEvent;
 
-	    if (isKey([ '-', 'Subtract' ], event) && isCmd(event)) {
+	    if (isKey('-', event) && isCmd(event)) {
 	      editorActions.trigger('stepZoom', { value: -1 });
 
 	      return true;
@@ -25922,7 +27051,7 @@
 
 	    var event = context.keyEvent;
 
-	    if (isKey([ 'Backspace', 'Delete', 'Del' ], event)) {
+	    if (isKey([ 'Backspace', 'Delete' ], event)) {
 	      editorActions.trigger('removeSelection');
 
 	      return true;
@@ -25940,8 +27069,8 @@
 	};
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../features/keyboard/Keyboard').default} Keyboard
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../features/keyboard/Keyboard.js').default} Keyboard
 	 */
 
 	var DEFAULT_CONFIG$1 = {
@@ -25982,10 +27111,10 @@
 	    }
 
 	    if (keyboard.isKey([
-	      'ArrowLeft', 'Left',
-	      'ArrowUp', 'Up',
-	      'ArrowDown', 'Down',
-	      'ArrowRight', 'Right'
+	      'ArrowLeft',
+	      'ArrowUp',
+	      'ArrowDown',
+	      'ArrowRight'
 	    ], event)) {
 
 	      var speed = (
@@ -25998,19 +27127,15 @@
 
 	      switch (event.key) {
 	      case 'ArrowLeft':
-	      case 'Left':
 	        direction = 'left';
 	        break;
 	      case 'ArrowUp':
-	      case 'Up':
 	        direction = 'up';
 	        break;
 	      case 'ArrowRight':
-	      case 'Right':
 	        direction = 'right';
 	        break;
 	      case 'ArrowDown':
-	      case 'Down':
 	        direction = 'down';
 	        break;
 	      }
@@ -26099,7 +27224,7 @@
 	}
 
 	/**
-	 * @typedef {import('../core/EventBus').default} EventBus
+	 * @typedef {import('../core/EventBus.js').default} EventBus
 	 */
 
 	var TRAP_PRIORITY = 5000;
@@ -26128,8 +27253,8 @@
 	}
 
 	/**
-	 * @typedef {import('../util/Types').Point} Point
-	 * @typedef {import('../util/Types').Rect} Rect
+	 * @typedef {import('./Types.js').Point} Point
+	 * @typedef {import('./Types.js').Rect} Rect
 	 */
 
 	/**
@@ -26157,8 +27282,8 @@
 	}
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 */
 
 	var THRESHOLD$1 = 15;
@@ -26186,6 +27311,12 @@
 	      eventBus.on('element.mousedown', 500, handleMousedown);
 	    } else {
 	      eventBus.off('element.mousedown', handleMousedown);
+	    }
+	  });
+
+	  eventBus.on('diagram.destroy', function() {
+	    if (context) {
+	      handleEnd();
 	    }
 	  });
 
@@ -26327,11 +27458,11 @@
 	}
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 *
-	 * @typedef {import('../../util/Types').Point} Point
-	 * @typedef {import('../../util/Types').ScrollDelta} ScrollDelta
+	 * @typedef {import('../../util/Types.js').Point} Point
+	 * @typedef {import('../../util/Types.js').ScrollDelta} ScrollDelta
 	 */
 
 	var sign = Math.sign || function(n) {
@@ -26587,10 +27718,11 @@
 	  Viewer.call(this, options);
 	}
 
-	e$2(NavigatedViewer, Viewer);
+	e$3(NavigatedViewer, Viewer);
 
 
 	NavigatedViewer.prototype._navigationModules = [
+	  KeepSelectionVisibleModule,
 	  KeyboardMoveModule,
 	  MoveCanvasModule,
 	  ZoomScrollModule
@@ -26602,13 +27734,13 @@
 	);
 
 	/**
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../model/Types.js').Element} Element
 	 *
-	 * @typedef {import('../modeling/Modeling').default} Modeling
-	 * @typedef {import('../rules/Rules').default} Rules
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
+	 * @typedef {import('../rules/Rules.js').default} Rules
 	 *
-	 * @typedef {import('../../util/Types').Axis} Axis
-	 * @typedef {import('../../util/Types').Dimension} Dimension
+	 * @typedef {import('../../util/Types.js').Axis} Axis
+	 * @typedef {import('../../util/Types.js').Dimension} Dimension
 	 *
 	 * @typedef { 'top' | 'right' | 'bottom' | 'left' | 'center' | 'middle' } Alignment
 	 */
@@ -26819,7 +27951,7 @@
 	 * @class
 	 * @constructor
 	 *
-	 * @param { import('../core/EventBus').default } eventBus
+	 * @param { import('../../core/EventBus.js').default } eventBus
 	 */
 	function Scheduler(eventBus) {
 
@@ -26931,18 +28063,18 @@
 	var MARKER_HIDDEN$1 = 'djs-element-hidden';
 
 	/**
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../model/Types.js').Element} Element
 	 *
-	 * @typedef {import('../../util/Types').Rect} Rect
-	 * @typedef {import('../../util/Types').RectTRBL} RectTRBL
+	 * @typedef {import('../../util/Types.js').Rect} Rect
+	 * @typedef {import('../../util/Types.js').RectTRBL} RectTRBL
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/ElementRegistry').default} ElementRegistry
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../../scheduler/Scheduler').default} Scheduler
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../scheduler/Scheduler.js').default} Scheduler
 	 *
-	 * @typedef {import('./ContextPadProvider').default} ContextPadProvider
-	 * @typedef {import('./ContextPadProvider').ContextPadEntries} ContextPadEntries
+	 * @typedef {import('./ContextPadProvider.js').default} ContextPadProvider
+	 * @typedef {import('./ContextPadProvider.js').ContextPadEntries} ContextPadEntries
 	 *
 	 */
 
@@ -27085,7 +28217,6 @@
 	 *
 	 * @param {ContextPadProvider} provider
 	 */
-
 	/**
 	 * Register a context pad provider with the given priority. See
 	 * {@link ContextPadProvider} for examples.
@@ -27241,6 +28372,12 @@
 	 */
 	ContextPad.prototype.open = function(target, force) {
 	  if (!force && this.isOpen(target)) {
+	    return;
+	  }
+
+	  var allowed = this._eventBus.fire('contextPad.open.allowed', { target: target });
+
+	  if (allowed === false) {
 	    return;
 	  }
 
@@ -27663,18 +28800,85 @@
 	  contextPad: [ 'type', ContextPad ]
 	};
 
-	var n$1,l$1,u$1,i$1,o$1,r$2,f$1,c$1={},s$1=[],a$1=/acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i,h$1=Array.isArray;function v$1(n,l){for(var u in l)n[u]=l[u];return n}function p$1(n){var l=n.parentNode;l&&l.removeChild(n);}function y$1(l,u,t){var i,o,r,f={};for(r in u)"key"==r?i=u[r]:"ref"==r?o=u[r]:f[r]=u[r];if(arguments.length>2&&(f.children=arguments.length>3?n$1.call(arguments,2):t),"function"==typeof l&&null!=l.defaultProps)for(r in l.defaultProps) void 0===f[r]&&(f[r]=l.defaultProps[r]);return d$1(l,f,i,o,null)}function d$1(n,t,i,o,r){var f={type:n,props:t,key:i,ref:o,__k:null,__:null,__b:0,__e:null,__d:void 0,__c:null,constructor:void 0,__v:null==r?++u$1:r,__i:-1,__u:0};return null==r&&null!=l$1.vnode&&l$1.vnode(f),f}function g(n){return n.children}function b(n,l){this.props=n,this.context=l;}function m$2(n,l){if(null==l)return n.__?m$2(n.__,n.__i+1):null;for(var u;l<n.__k.length;l++)if(null!=(u=n.__k[l])&&null!=u.__e)return u.__e;return "function"==typeof n.type?m$2(n):null}function w$1(n){var l,u;if(null!=(n=n.__)&&null!=n.__c){for(n.__e=n.__c.base=null,l=0;l<n.__k.length;l++)if(null!=(u=n.__k[l])&&null!=u.__e){n.__e=n.__c.base=u.__e;break}return w$1(n)}}function k$1(n){(!n.__d&&(n.__d=true)&&i$1.push(n)&&!x$1.__r++||o$1!==l$1.debounceRendering)&&((o$1=l$1.debounceRendering)||r$2)(x$1);}function x$1(){var n,u,t,o,r,e,c,s,a;for(i$1.sort(f$1);n=i$1.shift();)n.__d&&(u=i$1.length,o=void 0,e=(r=(t=n).__v).__e,s=[],a=[],(c=t.__P)&&((o=v$1({},r)).__v=r.__v+1,l$1.vnode&&l$1.vnode(o),L(c,o,r,t.__n,void 0!==c.ownerSVGElement,32&r.__u?[e]:null,s,null==e?m$2(r):e,!!(32&r.__u),a),o.__v=r.__v,o.__.__k[o.__i]=o,M(s,o,a),o.__e!=e&&w$1(o)),i$1.length>u&&i$1.sort(f$1));x$1.__r=0;}function C$1(n,l,u,t,i,o,r,f,e,a,h){var v,p,y,d,_,g=t&&t.__k||s$1,b=l.length;for(u.__d=e,P(u,l,g),e=u.__d,v=0;v<b;v++)null!=(y=u.__k[v])&&"boolean"!=typeof y&&"function"!=typeof y&&(p=-1===y.__i?c$1:g[y.__i]||c$1,y.__i=v,L(n,y,p,i,o,r,f,e,a,h),d=y.__e,y.ref&&p.ref!=y.ref&&(p.ref&&z$1(p.ref,null,y),h.push(y.ref,y.__c||d,y)),null==_&&null!=d&&(_=d),65536&y.__u||p.__k===y.__k?e=S(y,e,n):"function"==typeof y.type&&void 0!==y.__d?e=y.__d:d&&(e=d.nextSibling),y.__d=void 0,y.__u&=-196609);u.__d=e,u.__e=_;}function P(n,l,u){var t,i,o,r,f,e=l.length,c=u.length,s=c,a=0;for(n.__k=[],t=0;t<e;t++)r=t+a,null!=(i=n.__k[t]=null==(i=l[t])||"boolean"==typeof i||"function"==typeof i?null:"string"==typeof i||"number"==typeof i||"bigint"==typeof i||i.constructor==String?d$1(null,i,null,null,null):h$1(i)?d$1(g,{children:i},null,null,null):void 0===i.constructor&&i.__b>0?d$1(i.type,i.props,i.key,i.ref?i.ref:null,i.__v):i)?(i.__=n,i.__b=n.__b+1,f=H(i,u,r,s),i.__i=f,o=null,-1!==f&&(s--,(o=u[f])&&(o.__u|=131072)),null==o||null===o.__v?(-1==f&&a--,"function"!=typeof i.type&&(i.__u|=65536)):f!==r&&(f===r+1?a++:f>r?s>e-r?a+=f-r:a--:f<r?f==r-1&&(a=f-r):a=0,f!==t+a&&(i.__u|=65536))):(o=u[r])&&null==o.key&&o.__e&&0==(131072&o.__u)&&(o.__e==n.__d&&(n.__d=m$2(o)),N(o,o,false),u[r]=null,s--);if(s)for(t=0;t<c;t++)null!=(o=u[t])&&0==(131072&o.__u)&&(o.__e==n.__d&&(n.__d=m$2(o)),N(o,o));}function S(n,l,u){var t,i;if("function"==typeof n.type){for(t=n.__k,i=0;t&&i<t.length;i++)t[i]&&(t[i].__=n,l=S(t[i],l,u));return l}n.__e!=l&&(u.insertBefore(n.__e,l||null),l=n.__e);do{l=l&&l.nextSibling;}while(null!=l&&8===l.nodeType);return l}function H(n,l,u,t){var i=n.key,o=n.type,r=u-1,f=u+1,e=l[u];if(null===e||e&&i==e.key&&o===e.type&&0==(131072&e.__u))return u;if(t>(null!=e&&0==(131072&e.__u)?1:0))for(;r>=0||f<l.length;){if(r>=0){if((e=l[r])&&0==(131072&e.__u)&&i==e.key&&o===e.type)return r;r--;}if(f<l.length){if((e=l[f])&&0==(131072&e.__u)&&i==e.key&&o===e.type)return f;f++;}}return  -1}function I(n,l,u){"-"===l[0]?n.setProperty(l,null==u?"":u):n[l]=null==u?"":"number"!=typeof u||a$1.test(l)?u:u+"px";}function T(n,l,u,t,i){var o;n:if("style"===l)if("string"==typeof u)n.style.cssText=u;else {if("string"==typeof t&&(n.style.cssText=t=""),t)for(l in t)u&&l in u||I(n.style,l,"");if(u)for(l in u)t&&u[l]===t[l]||I(n.style,l,u[l]);}else if("o"===l[0]&&"n"===l[1])o=l!==(l=l.replace(/(PointerCapture)$|Capture$/i,"$1")),l=l.toLowerCase()in n?l.toLowerCase().slice(2):l.slice(2),n.l||(n.l={}),n.l[l+o]=u,u?t?u.u=t.u:(u.u=Date.now(),n.addEventListener(l,o?D$1:A$1,o)):n.removeEventListener(l,o?D$1:A$1,o);else {if(i)l=l.replace(/xlink(H|:h)/,"h").replace(/sName$/,"s");else if("width"!==l&&"height"!==l&&"href"!==l&&"list"!==l&&"form"!==l&&"tabIndex"!==l&&"download"!==l&&"rowSpan"!==l&&"colSpan"!==l&&"role"!==l&&l in n)try{n[l]=null==u?"":u;break n}catch(n){}"function"==typeof u||(null==u||false===u&&"-"!==l[4]?n.removeAttribute(l):n.setAttribute(l,u));}}function A$1(n){if(this.l){var u=this.l[n.type+false];if(n.t){if(n.t<=u.u)return}else n.t=Date.now();return u(l$1.event?l$1.event(n):n)}}function D$1(n){if(this.l)return this.l[n.type+true](l$1.event?l$1.event(n):n)}function L(n,u,t,i,o,r,f,e,c,s){var a,p,y,d,_,m,w,k,x,P,S,$,H,I,T,A=u.type;if(void 0!==u.constructor)return null;128&t.__u&&(c=!!(32&t.__u),r=[e=u.__e=t.__e]),(a=l$1.__b)&&a(u);n:if("function"==typeof A)try{if(k=u.props,x=(a=A.contextType)&&i[a.__c],P=a?x?x.props.value:a.__:i,t.__c?w=(p=u.__c=t.__c).__=p.__E:("prototype"in A&&A.prototype.render?u.__c=p=new A(k,P):(u.__c=p=new b(k,P),p.constructor=A,p.render=O),x&&x.sub(p),p.props=k,p.state||(p.state={}),p.context=P,p.__n=i,y=p.__d=!0,p.__h=[],p._sb=[]),null==p.__s&&(p.__s=p.state),null!=A.getDerivedStateFromProps&&(p.__s==p.state&&(p.__s=v$1({},p.__s)),v$1(p.__s,A.getDerivedStateFromProps(k,p.__s))),d=p.props,_=p.state,p.__v=u,y)null==A.getDerivedStateFromProps&&null!=p.componentWillMount&&p.componentWillMount(),null!=p.componentDidMount&&p.__h.push(p.componentDidMount);else {if(null==A.getDerivedStateFromProps&&k!==d&&null!=p.componentWillReceiveProps&&p.componentWillReceiveProps(k,P),!p.__e&&(null!=p.shouldComponentUpdate&&!1===p.shouldComponentUpdate(k,p.__s,P)||u.__v===t.__v)){for(u.__v!==t.__v&&(p.props=k,p.state=p.__s,p.__d=!1),u.__e=t.__e,u.__k=t.__k,u.__k.forEach(function(n){n&&(n.__=u);}),S=0;S<p._sb.length;S++)p.__h.push(p._sb[S]);p._sb=[],p.__h.length&&f.push(p);break n}null!=p.componentWillUpdate&&p.componentWillUpdate(k,p.__s,P),null!=p.componentDidUpdate&&p.__h.push(function(){p.componentDidUpdate(d,_,m);});}if(p.context=P,p.props=k,p.__P=n,p.__e=!1,$=l$1.__r,H=0,"prototype"in A&&A.prototype.render){for(p.state=p.__s,p.__d=!1,$&&$(u),a=p.render(p.props,p.state,p.context),I=0;I<p._sb.length;I++)p.__h.push(p._sb[I]);p._sb=[];}else do{p.__d=!1,$&&$(u),a=p.render(p.props,p.state,p.context),p.state=p.__s;}while(p.__d&&++H<25);p.state=p.__s,null!=p.getChildContext&&(i=v$1(v$1({},i),p.getChildContext())),y||null==p.getSnapshotBeforeUpdate||(m=p.getSnapshotBeforeUpdate(d,_)),C$1(n,h$1(T=null!=a&&a.type===g&&null==a.key?a.props.children:a)?T:[T],u,t,i,o,r,f,e,c,s),p.base=u.__e,u.__u&=-161,p.__h.length&&f.push(p),w&&(p.__E=p.__=null);}catch(n){u.__v=null,c||null!=r?(u.__e=e,u.__u|=c?160:32,r[r.indexOf(e)]=null):(u.__e=t.__e,u.__k=t.__k),l$1.__e(n,u,t);}else null==r&&u.__v===t.__v?(u.__k=t.__k,u.__e=t.__e):u.__e=j$1(t.__e,u,t,i,o,r,f,c,s);(a=l$1.diffed)&&a(u);}function M(n,u,t){u.__d=void 0;for(var i=0;i<t.length;i++)z$1(t[i],t[++i],t[++i]);l$1.__c&&l$1.__c(u,n),n.some(function(u){try{n=u.__h,u.__h=[],n.some(function(n){n.call(u);});}catch(n){l$1.__e(n,u.__v);}});}function j$1(l,u,t,i,o,r,f,e,s){var a,v,y,d,_,g,b,w=t.props,k=u.props,x=u.type;if("svg"===x&&(o=true),null!=r)for(a=0;a<r.length;a++)if((_=r[a])&&"setAttribute"in _==!!x&&(x?_.localName===x:3===_.nodeType)){l=_,r[a]=null;break}if(null==l){if(null===x)return document.createTextNode(k);l=o?document.createElementNS("http://www.w3.org/2000/svg",x):document.createElement(x,k.is&&k),r=null,e=false;}if(null===x)w===k||e&&l.data===k||(l.data=k);else {if(r=r&&n$1.call(l.childNodes),w=t.props||c$1,!e&&null!=r)for(w={},a=0;a<l.attributes.length;a++)w[(_=l.attributes[a]).name]=_.value;for(a in w)_=w[a],"children"==a||("dangerouslySetInnerHTML"==a?y=_:"key"===a||a in k||T(l,a,null,_,o));for(a in k)_=k[a],"children"==a?d=_:"dangerouslySetInnerHTML"==a?v=_:"value"==a?g=_:"checked"==a?b=_:"key"===a||e&&"function"!=typeof _||w[a]===_||T(l,a,_,w[a],o);if(v)e||y&&(v.__html===y.__html||v.__html===l.innerHTML)||(l.innerHTML=v.__html),u.__k=[];else if(y&&(l.innerHTML=""),C$1(l,h$1(d)?d:[d],u,t,i,o&&"foreignObject"!==x,r,f,r?r[0]:t.__k&&m$2(t,0),e,s),null!=r)for(a=r.length;a--;)null!=r[a]&&p$1(r[a]);e||(a="value",void 0!==g&&(g!==l[a]||"progress"===x&&!g||"option"===x&&g!==w[a])&&T(l,a,g,w[a],false),a="checked",void 0!==b&&b!==l[a]&&T(l,a,b,w[a],false));}return l}function z$1(n,u,t){try{"function"==typeof n?n(u):n.current=u;}catch(n){l$1.__e(n,t);}}function N(n,u,t){var i,o;if(l$1.unmount&&l$1.unmount(n),(i=n.ref)&&(i.current&&i.current!==n.__e||z$1(i,null,u)),null!=(i=n.__c)){if(i.componentWillUnmount)try{i.componentWillUnmount();}catch(n){l$1.__e(n,u);}i.base=i.__P=null,n.__c=void 0;}if(i=n.__k)for(o=0;o<i.length;o++)i[o]&&N(i[o],u,t||"function"!=typeof n.type);t||null==n.__e||p$1(n.__e),n.__=n.__e=n.__d=void 0;}function O(n,l,u){return this.constructor(n,u)}function q$1(u,t,i){var o,r,f,e;l$1.__&&l$1.__(u,t),r=(o="function"=="undefined")?null:t.__k,f=[],e=[],L(t,u=(t).__k=y$1(g,null,[u]),r||c$1,c$1,void 0!==t.ownerSVGElement,r?null:t.firstChild?n$1.call(t.childNodes):null,f,r?r.__e:t.firstChild,o,e),M(f,u,e);}n$1=s$1.slice,l$1={__e:function(n,l,u,t){for(var i,o,r;l=l.__;)if((i=l.__c)&&!i.__)try{if((o=i.constructor)&&null!=o.getDerivedStateFromError&&(i.setState(o.getDerivedStateFromError(n)),r=i.__d),null!=i.componentDidCatch&&(i.componentDidCatch(n,t||{}),r=i.__d),r)return i.__E=i}catch(l){n=l;}throw n}},u$1=0,b.prototype.setState=function(n,l){var u;u=null!=this.__s&&this.__s!==this.state?this.__s:this.__s=v$1({},this.state),"function"==typeof n&&(n=n(v$1({},u),this.props)),n&&v$1(u,n),null!=n&&this.__v&&(l&&this._sb.push(l),k$1(this));},b.prototype.forceUpdate=function(n){this.__v&&(this.__e=true,n&&this.__h.push(n),k$1(this));},b.prototype.render=g,i$1=[],r$2="function"==typeof Promise?Promise.prototype.then.bind(Promise.resolve()):setTimeout,f$1=function(n,l){return n.__v.__b-l.__v.__b},x$1.__r=0;
+	var n$1,l$1,u$1,i$1,r$2,o$1,e$2,f$1,c$1,a$1,s$1,h$1,p$1,v$1,d$1={},w$1=[],_$1=/acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i,g=Array.isArray;function m$2(n,l){for(var u in l)n[u]=l[u];return n}function b(n){n&&n.parentNode&&n.parentNode.removeChild(n);}function k$1(l,u,t){var i,r,o,e={};for(o in u)"key"==o?i=u[o]:"ref"==o?r=u[o]:e[o]=u[o];if(arguments.length>2&&(e.children=arguments.length>3?n$1.call(arguments,2):t),"function"==typeof l&&null!=l.defaultProps)for(o in l.defaultProps) void 0===e[o]&&(e[o]=l.defaultProps[o]);return x(l,e,i,r,null)}function x(n,t,i,r,o){var e={type:n,props:t,key:i,ref:r,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:null==o?++u$1:o,__i:-1,__u:0};return null==o&&null!=l$1.vnode&&l$1.vnode(e),e}function S(n){return n.children}function C$1(n,l){this.props=n,this.context=l;}function $(n,l){if(null==l)return n.__?$(n.__,n.__i+1):null;for(var u;l<n.__k.length;l++)if(null!=(u=n.__k[l])&&null!=u.__e)return u.__e;return "function"==typeof n.type?$(n):null}function I(n){if(n.__P&&n.__d){var u=n.__v,t=u.__e,i=[],r=[],o=m$2({},u);o.__v=u.__v+1,l$1.vnode&&l$1.vnode(o),q$1(n.__P,o,u,n.__n,n.__P.namespaceURI,32&u.__u?[t]:null,i,null==t?$(u):t,!!(32&u.__u),r),o.__v=u.__v,o.__.__k[o.__i]=o,D$1(i,o,r),u.__e=u.__=null,o.__e!=t&&P(o);}}function P(n){if(null!=(n=n.__)&&null!=n.__c)return n.__e=n.__c.base=null,n.__k.some(function(l){if(null!=l&&null!=l.__e)return n.__e=n.__c.base=l.__e}),P(n)}function A$1(n){(!n.__d&&(n.__d=true)&&i$1.push(n)&&!H.__r++||r$2!=l$1.debounceRendering)&&((r$2=l$1.debounceRendering)||o$1)(H);}function H(){try{for(var n,l=1;i$1.length;)i$1.length>l&&i$1.sort(e$2),n=i$1.shift(),l=i$1.length,I(n);}finally{i$1.length=H.__r=0;}}function L(n,l,u,t,i,r,o,e,f,c,a){var s,h,p,v,y,_,g,m=t&&t.__k||w$1,b=l.length;for(f=T$1(u,l,m,f,b),s=0;s<b;s++)null!=(p=u.__k[s])&&(h=-1!=p.__i&&m[p.__i]||d$1,p.__i=s,_=q$1(n,p,h,i,r,o,e,f,c,a),v=p.__e,p.ref&&h.ref!=p.ref&&(h.ref&&J(h.ref,null,p),a.push(p.ref,p.__c||v,p)),null==y&&null!=v&&(y=v),(g=!!(4&p.__u))||h.__k===p.__k?(f=j$1(p,f,n,g),g&&h.__e&&(h.__e=null)):"function"==typeof p.type&&void 0!==_?f=_:v&&(f=v.nextSibling),p.__u&=-7);return u.__e=y,f}function T$1(n,l,u,t,i){var r,o,e,f,c,a=u.length,s=a,h=0;for(n.__k=new Array(i),r=0;r<i;r++)null!=(o=l[r])&&"boolean"!=typeof o&&"function"!=typeof o?("string"==typeof o||"number"==typeof o||"bigint"==typeof o||o.constructor==String?o=n.__k[r]=x(null,o,null,null,null):g(o)?o=n.__k[r]=x(S,{children:o},null,null,null):void 0===o.constructor&&o.__b>0?o=n.__k[r]=x(o.type,o.props,o.key,o.ref?o.ref:null,o.__v):n.__k[r]=o,f=r+h,o.__=n,o.__b=n.__b+1,e=null,-1!=(c=o.__i=O(o,u,f,s))&&(s--,(e=u[c])&&(e.__u|=2)),null==e||null==e.__v?(-1==c&&(i>a?h--:i<a&&h++),"function"!=typeof o.type&&(o.__u|=4)):c!=f&&(c==f-1?h--:c==f+1?h++:(c>f?h--:h++,o.__u|=4))):n.__k[r]=null;if(s)for(r=0;r<a;r++)null!=(e=u[r])&&0==(2&e.__u)&&(e.__e==t&&(t=$(e)),K(e,e));return t}function j$1(n,l,u,t){var i,r;if("function"==typeof n.type){for(i=n.__k,r=0;i&&r<i.length;r++)i[r]&&(i[r].__=n,l=j$1(i[r],l,u,t));return l}n.__e!=l&&(t&&(l&&n.type&&!l.parentNode&&(l=$(n)),u.insertBefore(n.__e,l||null)),l=n.__e);do{l=l&&l.nextSibling;}while(null!=l&&8==l.nodeType);return l}function O(n,l,u,t){var i,r,o,e=n.key,f=n.type,c=l[u],a=null!=c&&0==(2&c.__u);if(null===c&&null==e||a&&e==c.key&&f==c.type)return u;if(t>(a?1:0))for(i=u-1,r=u+1;i>=0||r<l.length;)if(null!=(c=l[o=i>=0?i--:r++])&&0==(2&c.__u)&&e==c.key&&f==c.type)return o;return  -1}function z$1(n,l,u){"-"==l[0]?n.setProperty(l,null==u?"":u):n[l]=null==u?"":"number"!=typeof u||_$1.test(l)?u:u+"px";}function N(n,l,u,t,i){var r,o;n:if("style"==l)if("string"==typeof u)n.style.cssText=u;else {if("string"==typeof t&&(n.style.cssText=t=""),t)for(l in t)u&&l in u||z$1(n.style,l,"");if(u)for(l in u)t&&u[l]==t[l]||z$1(n.style,l,u[l]);}else if("o"==l[0]&&"n"==l[1])r=l!=(l=l.replace(s$1,"$1")),o=l.toLowerCase(),l=o in n||"onFocusOut"==l||"onFocusIn"==l?o.slice(2):l.slice(2),n.l||(n.l={}),n.l[l+r]=u,u?t?u[a$1]=t[a$1]:(u[a$1]=h$1,n.addEventListener(l,r?v$1:p$1,r)):n.removeEventListener(l,r?v$1:p$1,r);else {if("http://www.w3.org/2000/svg"==i)l=l.replace(/xlink(H|:h)/,"h").replace(/sName$/,"s");else if("width"!=l&&"height"!=l&&"href"!=l&&"list"!=l&&"form"!=l&&"tabIndex"!=l&&"download"!=l&&"rowSpan"!=l&&"colSpan"!=l&&"role"!=l&&"popover"!=l&&l in n)try{n[l]=null==u?"":u;break n}catch(n){}"function"==typeof u||(null==u||false===u&&"-"!=l[4]?n.removeAttribute(l):n.setAttribute(l,"popover"==l&&1==u?"":u));}}function V(n){return function(u){if(this.l){var t=this.l[u.type+n];if(null==u[c$1])u[c$1]=h$1++;else if(u[c$1]<t[a$1])return;return t(l$1.event?l$1.event(u):u)}}}function q$1(n,u,t,i,r,o,e,f,c,a){var s,h,p,v,y,d,_,k,x,M,$,I,P,A,H,T=u.type;if(void 0!==u.constructor)return null;128&t.__u&&(c=!!(32&t.__u),o=[f=u.__e=t.__e]),(s=l$1.__b)&&s(u);n:if("function"==typeof T)try{if(k=u.props,x=T.prototype&&T.prototype.render,M=(s=T.contextType)&&i[s.__c],$=s?M?M.props.value:s.__:i,t.__c?_=(h=u.__c=t.__c).__=h.__E:(x?u.__c=h=new T(k,$):(u.__c=h=new C$1(k,$),h.constructor=T,h.render=Q),M&&M.sub(h),h.state||(h.state={}),h.__n=i,p=h.__d=!0,h.__h=[],h._sb=[]),x&&null==h.__s&&(h.__s=h.state),x&&null!=T.getDerivedStateFromProps&&(h.__s==h.state&&(h.__s=m$2({},h.__s)),m$2(h.__s,T.getDerivedStateFromProps(k,h.__s))),v=h.props,y=h.state,h.__v=u,p)x&&null==T.getDerivedStateFromProps&&null!=h.componentWillMount&&h.componentWillMount(),x&&null!=h.componentDidMount&&h.__h.push(h.componentDidMount);else {if(x&&null==T.getDerivedStateFromProps&&k!==v&&null!=h.componentWillReceiveProps&&h.componentWillReceiveProps(k,$),u.__v==t.__v||!h.__e&&null!=h.shouldComponentUpdate&&!1===h.shouldComponentUpdate(k,h.__s,$)){u.__v!=t.__v&&(h.props=k,h.state=h.__s,h.__d=!1),u.__e=t.__e,u.__k=t.__k,u.__k.some(function(n){n&&(n.__=u);}),w$1.push.apply(h.__h,h._sb),h._sb=[],h.__h.length&&e.push(h);break n}null!=h.componentWillUpdate&&h.componentWillUpdate(k,h.__s,$),x&&null!=h.componentDidUpdate&&h.__h.push(function(){h.componentDidUpdate(v,y,d);});}if(h.context=$,h.props=k,h.__P=n,h.__e=!1,I=l$1.__r,P=0,x)h.state=h.__s,h.__d=!1,I&&I(u),s=h.render(h.props,h.state,h.context),w$1.push.apply(h.__h,h._sb),h._sb=[];else do{h.__d=!1,I&&I(u),s=h.render(h.props,h.state,h.context),h.state=h.__s;}while(h.__d&&++P<25);h.state=h.__s,null!=h.getChildContext&&(i=m$2(m$2({},i),h.getChildContext())),x&&!p&&null!=h.getSnapshotBeforeUpdate&&(d=h.getSnapshotBeforeUpdate(v,y)),A=null!=s&&s.type===S&&null==s.key?E(s.props.children):s,f=L(n,g(A)?A:[A],u,t,i,r,o,e,f,c,a),h.base=u.__e,u.__u&=-161,h.__h.length&&e.push(h),_&&(h.__E=h.__=null);}catch(n){if(u.__v=null,c||null!=o)if(n.then){for(u.__u|=c?160:128;f&&8==f.nodeType&&f.nextSibling;)f=f.nextSibling;o[o.indexOf(f)]=null,u.__e=f;}else {for(H=o.length;H--;)b(o[H]);B$1(u);}else u.__e=t.__e,u.__k=t.__k,n.then||B$1(u);l$1.__e(n,u,t);}else null==o&&u.__v==t.__v?(u.__k=t.__k,u.__e=t.__e):f=u.__e=G(t.__e,u,t,i,r,o,e,c,a);return (s=l$1.diffed)&&s(u),128&u.__u?void 0:f}function B$1(n){n&&(n.__c&&(n.__c.__e=true),n.__k&&n.__k.some(B$1));}function D$1(n,u,t){for(var i=0;i<t.length;i++)J(t[i],t[++i],t[++i]);l$1.__c&&l$1.__c(u,n),n.some(function(u){try{n=u.__h,u.__h=[],n.some(function(n){n.call(u);});}catch(n){l$1.__e(n,u.__v);}});}function E(n){return "object"!=typeof n||null==n||n.__b>0?n:g(n)?n.map(E):void 0!==n.constructor?null:m$2({},n)}function G(u,t,i,r,o,e,f,c,a){var s,h,p,v,y,w,_,m=i.props||d$1,k=t.props,x=t.type;if("svg"==x?o="http://www.w3.org/2000/svg":"math"==x?o="http://www.w3.org/1998/Math/MathML":o||(o="http://www.w3.org/1999/xhtml"),null!=e)for(s=0;s<e.length;s++)if((y=e[s])&&"setAttribute"in y==!!x&&(x?y.localName==x:3==y.nodeType)){u=y,e[s]=null;break}if(null==u){if(null==x)return document.createTextNode(k);u=document.createElementNS(o,x,k.is&&k),c&&(l$1.__m&&l$1.__m(t,e),c=false),e=null;}if(null==x)m===k||c&&u.data==k||(u.data=k);else {if(e="textarea"==x&&null!=k.defaultValue?null:e&&n$1.call(u.childNodes),!c&&null!=e)for(m={},s=0;s<u.attributes.length;s++)m[(y=u.attributes[s]).name]=y.value;for(s in m)y=m[s],"dangerouslySetInnerHTML"==s?p=y:"children"==s||s in k||"value"==s&&"defaultValue"in k||"checked"==s&&"defaultChecked"in k||N(u,s,null,y,o);for(s in k)y=k[s],"children"==s?v=y:"dangerouslySetInnerHTML"==s?h=y:"value"==s?w=y:"checked"==s?_=y:c&&"function"!=typeof y||m[s]===y||N(u,s,y,m[s],o);if(h)c||p&&(h.__html==p.__html||h.__html==u.innerHTML)||(u.innerHTML=h.__html),t.__k=[];else if(p&&(u.innerHTML=""),L("template"==t.type?u.content:u,g(v)?v:[v],t,i,r,"foreignObject"==x?"http://www.w3.org/1999/xhtml":o,e,f,e?e[0]:i.__k&&$(i,0),c,a),null!=e)for(s=e.length;s--;)b(e[s]);c&&"textarea"!=x||(s="value","progress"==x&&null==w?u.removeAttribute("value"):null!=w&&(w!==u[s]||"progress"==x&&!w||"option"==x&&w!=m[s])&&N(u,s,w,m[s],o),s="checked",null!=_&&_!=u[s]&&N(u,s,_,m[s],o));}return u}function J(n,u,t){try{if("function"==typeof n){var i="function"==typeof n.__u;i&&n.__u(),i&&null==u||(n.__u=n(u));}else n.current=u;}catch(n){l$1.__e(n,t);}}function K(n,u,t){var i,r;if(l$1.unmount&&l$1.unmount(n),(i=n.ref)&&(i.current&&i.current!=n.__e||J(i,null,u)),null!=(i=n.__c)){if(i.componentWillUnmount)try{i.componentWillUnmount();}catch(n){l$1.__e(n,u);}i.base=i.__P=null;}if(i=n.__k)for(r=0;r<i.length;r++)i[r]&&K(i[r],u,t||"function"!=typeof n.type);t||b(n.__e),n.__c=n.__=n.__e=void 0;}function Q(n,l,u){return this.constructor(n,u)}function R(u,t,i){var r,o,e,f;t==document&&(t=document.documentElement),l$1.__&&l$1.__(u,t),o=(r="function"=="undefined")?null:t.__k,e=[],f=[],q$1(t,u=(t).__k=k$1(S,null,[u]),o||d$1,d$1,t.namespaceURI,o?null:t.firstChild?n$1.call(t.childNodes):null,e,o?o.__e:t.firstChild,r,f),D$1(e,u,f);}n$1=w$1.slice,l$1={__e:function(n,l,u,t){for(var i,r,o;l=l.__;)if((i=l.__c)&&!i.__)try{if((r=i.constructor)&&null!=r.getDerivedStateFromError&&(i.setState(r.getDerivedStateFromError(n)),o=i.__d),null!=i.componentDidCatch&&(i.componentDidCatch(n,t||{}),o=i.__d),o)return i.__E=i}catch(l){n=l;}throw n}},u$1=0,C$1.prototype.setState=function(n,l){var u;u=null!=this.__s&&this.__s!=this.state?this.__s:this.__s=m$2({},this.state),"function"==typeof n&&(n=n(m$2({},u),this.props)),n&&m$2(u,n),null!=n&&this.__v&&(l&&this._sb.push(l),A$1(this));},C$1.prototype.forceUpdate=function(n){this.__v&&(this.__e=true,n&&this.__h.push(n),A$1(this));},C$1.prototype.render=S,i$1=[],o$1="function"==typeof Promise?Promise.prototype.then.bind(Promise.resolve()):setTimeout,e$2=function(n,l){return n.__v.__b-l.__v.__b},H.__r=0,f$1=Math.random().toString(8),c$1="__d"+f$1,a$1="__a"+f$1,s$1=/(PointerCapture)$|Capture$/i,h$1=0,p$1=V(false),v$1=V(true);
 
 	var n=function(t,s,r,e){var u;s[0]=0;for(var h=1;h<s.length;h++){var p=s[h++],a=s[h]?(s[0]|=p?1:2,r[s[h++]]):s[++h];3===p?e[0]=a:4===p?e[1]=Object.assign(e[1]||{},a):5===p?(e[1]=e[1]||{})[s[++h]]=a:6===p?e[1][s[++h]]+=a+"":p?(u=t.apply(a,n(t,a,r,["",null])),e.push(u),a[0]?s[0]|=2:(s[h-2]=0,s[h]=u)):e.push(a);}return e},t$1=new Map;function e$1(s){var r=t$1.get(this);return r||(r=new Map,t$1.set(this,r)),(r=n(this,r.get(s)||(r.set(s,r=function(n){for(var t,s,r=1,e="",u="",h=[0],p=function(n){1===r&&(n||(e=e.replace(/^\s*\n\s*|\s*\n\s*$/g,"")))?h.push(0,n,e):3===r&&(n||e)?(h.push(3,n,e),r=2):2===r&&"..."===e&&n?h.push(4,n,0):2===r&&e&&!n?h.push(5,0,true,e):r>=5&&((e||!n&&5===r)&&(h.push(r,0,e,s),r=6),n&&(h.push(r,n,0,s),r=6)),e="";},a=0;a<n.length;a++){a&&(1===r&&p(),p(a));for(var l=0;l<n[a].length;l++)t=n[a][l],1===r?"<"===t?(p(),h=[h],r=3):e+=t:4===r?"--"===e&&">"===t?(r=1,e=""):e=t+e[0]:u?t===u?u="":e+=t:'"'===t||"'"===t?u=t:">"===t?(p(),r=1):r&&("="===t?(r=5,s=e,e=""):"/"===t&&(r<5||">"===n[a][l+1])?(p(),3===r&&(h=h[0]),r=h,(h=h[0]).push(2,0,r),r=0):" "===t||"\t"===t||"\n"===t||"\r"===t?(p(),r=2):e+=t),3===r&&"!--"===e&&(r=4,h=h[0]);}return p(),h}(s)),r),arguments,[])).length>1?r:r[0]}
 
-	var m$1=e$1.bind(y$1);
+	var m$1=e$1.bind(k$1);
 
-	var t,r$1,u,i,o=0,f=[],c=[],e=l$1,a=e.__b,v=e.__r,l=e.diffed,m=e.__c,s=e.unmount,d=e.__;function h(n,t){e.__h&&e.__h(r$1,n,o||t),o=0;var u=r$1.__H||(r$1.__H={__:[],__h:[]});return n>=u.__.length&&u.__.push({__V:c}),u.__[n]}function p(n){return o=1,y(D,n)}function y(n,u,i){var o=h(t++,2);if(o.t=n,!o.__c&&(o.__=[D(void 0,u),function(n){var t=o.__N?o.__N[0]:o.__[0],r=o.t(t,n);t!==r&&(o.__N=[r,o.__[1]],o.__c.setState({}));}],o.__c=r$1,!r$1.u)){var f=function(n,t,r){if(!o.__c.__H)return  true;var u=o.__c.__H.__.filter(function(n){return !!n.__c});if(u.every(function(n){return !n.__N}))return !c||c.call(this,n,t,r);var i=false;return u.forEach(function(n){if(n.__N){var t=n.__[0];n.__=n.__N,n.__N=void 0,t!==n.__[0]&&(i=true);}}),!(!i&&o.__c.props===n)&&(!c||c.call(this,n,t,r))};r$1.u=true;var c=r$1.shouldComponentUpdate,e=r$1.componentWillUpdate;r$1.componentWillUpdate=function(n,t,r){if(this.__e){var u=c;c=void 0,f(n,t,r),c=u;}e&&e.call(this,n,t,r);},r$1.shouldComponentUpdate=f;}return o.__N||o.__}function _(n,u){var i=h(t++,3);!e.__s&&C(i.__H,u)&&(i.__=n,i.i=u,r$1.__H.__h.push(i));}function A(n,u){var i=h(t++,4);!e.__s&&C(i.__H,u)&&(i.__=n,i.i=u,r$1.__h.push(i));}function F(n){return o=5,q(function(){return {current:n}},[])}function q(n,r){var u=h(t++,7);return C(u.__H,r)?(u.__V=n(),u.i=r,u.__h=n,u.__V):u.__}function x(n,t){return o=8,q(function(){return n},t)}function j(){for(var n;n=f.shift();)if(n.__P&&n.__H)try{n.__H.__h.forEach(z),n.__H.__h.forEach(B),n.__H.__h=[];}catch(t){n.__H.__h=[],e.__e(t,n.__v);}}e.__b=function(n){r$1=null,a&&a(n);},e.__=function(n,t){n&&t.__k&&t.__k.__m&&(n.__m=t.__k.__m),d&&d(n,t);},e.__r=function(n){v&&v(n),t=0;var i=(r$1=n.__c).__H;i&&(u===r$1?(i.__h=[],r$1.__h=[],i.__.forEach(function(n){n.__N&&(n.__=n.__N),n.__V=c,n.__N=n.i=void 0;})):(i.__h.forEach(z),i.__h.forEach(B),i.__h=[],t=0)),u=r$1;},e.diffed=function(n){l&&l(n);var t=n.__c;t&&t.__H&&(t.__H.__h.length&&(1!==f.push(t)&&i===e.requestAnimationFrame||((i=e.requestAnimationFrame)||w)(j)),t.__H.__.forEach(function(n){n.i&&(n.__H=n.i),n.__V!==c&&(n.__=n.__V),n.i=void 0,n.__V=c;})),u=r$1=null;},e.__c=function(n,t){t.some(function(n){try{n.__h.forEach(z),n.__h=n.__h.filter(function(n){return !n.__||B(n)});}catch(r){t.some(function(n){n.__h&&(n.__h=[]);}),t=[],e.__e(r,n.__v);}}),m&&m(n,t);},e.unmount=function(n){s&&s(n);var t,r=n.__c;r&&r.__H&&(r.__H.__.forEach(function(n){try{z(n);}catch(n){t=n;}}),r.__H=void 0,t&&e.__e(t,r.__v));};var k="function"==typeof requestAnimationFrame;function w(n){var t,r=function(){clearTimeout(u),k&&cancelAnimationFrame(t),setTimeout(n);},u=setTimeout(r,100);k&&(t=requestAnimationFrame(r));}function z(n){var t=r$1,u=n.__c;"function"==typeof u&&(n.__c=void 0,u()),r$1=t;}function B(n){var t=r$1;n.__c=n.__(),r$1=t;}function C(n,t){return !n||n.length!==t.length||t.some(function(t,r){return t!==n[r]})}function D(n,t){return "function"==typeof t?t(n):t}
+	var t,r$1,u,i,o=0,f=[],c=l$1,e=c.__b,a=c.__r,v=c.diffed,l=c.__c,m=c.unmount,s=c.__;function p(n,t){c.__h&&c.__h(r$1,n,o||t),o=0;var u=r$1.__H||(r$1.__H={__:[],__h:[]});return n>=u.__.length&&u.__.push({}),u.__[n]}function d(n){return o=1,h(D,n)}function h(n,u,i){var o=p(t++,2);if(o.t=n,!o.__c&&(o.__=[D(void 0,u),function(n){var t=o.__N?o.__N[0]:o.__[0],r=o.t(t,n);t!==r&&(o.__N=[r,o.__[1]],o.__c.setState({}));}],o.__c=r$1,!r$1.__f)){var f=function(n,t,r){if(!o.__c.__H)return  true;var u=o.__c.__H.__.filter(function(n){return n.__c});if(u.every(function(n){return !n.__N}))return !c||c.call(this,n,t,r);var i=o.__c.props!==n;return u.some(function(n){if(n.__N){var t=n.__[0];n.__=n.__N,n.__N=void 0,t!==n.__[0]&&(i=true);}}),c&&c.call(this,n,t,r)||i};r$1.__f=true;var c=r$1.shouldComponentUpdate,e=r$1.componentWillUpdate;r$1.componentWillUpdate=function(n,t,r){if(this.__e){var u=c;c=void 0,f(n,t,r),c=u;}e&&e.call(this,n,t,r);},r$1.shouldComponentUpdate=f;}return o.__N||o.__}function y(n,u){var i=p(t++,3);!c.__s&&C(i.__H,u)&&(i.__=n,i.u=u,r$1.__H.__h.push(i));}function _(n,u){var i=p(t++,4);!c.__s&&C(i.__H,u)&&(i.__=n,i.u=u,r$1.__h.push(i));}function A(n){return o=5,T(function(){return {current:n}},[])}function T(n,r){var u=p(t++,7);return C(u.__H,r)&&(u.__=n(),u.__H=r,u.__h=n),u.__}function q(n,t){return o=8,T(function(){return n},t)}function j(){for(var n;n=f.shift();){var t=n.__H;if(n.__P&&t)try{t.__h.some(z),t.__h.some(B),t.__h=[];}catch(r){t.__h=[],c.__e(r,n.__v);}}}c.__b=function(n){r$1=null,e&&e(n);},c.__=function(n,t){n&&t.__k&&t.__k.__m&&(n.__m=t.__k.__m),s&&s(n,t);},c.__r=function(n){a&&a(n),t=0;var i=(r$1=n.__c).__H;i&&(u===r$1?(i.__h=[],r$1.__h=[],i.__.some(function(n){n.__N&&(n.__=n.__N),n.u=n.__N=void 0;})):(i.__h.some(z),i.__h.some(B),i.__h=[],t=0)),u=r$1;},c.diffed=function(n){v&&v(n);var t=n.__c;t&&t.__H&&(t.__H.__h.length&&(1!==f.push(t)&&i===c.requestAnimationFrame||((i=c.requestAnimationFrame)||w)(j)),t.__H.__.some(function(n){n.u&&(n.__H=n.u),n.u=void 0;})),u=r$1=null;},c.__c=function(n,t){t.some(function(n){try{n.__h.some(z),n.__h=n.__h.filter(function(n){return !n.__||B(n)});}catch(r){t.some(function(n){n.__h&&(n.__h=[]);}),t=[],c.__e(r,n.__v);}}),l&&l(n,t);},c.unmount=function(n){m&&m(n);var t,r=n.__c;r&&r.__H&&(r.__H.__.some(function(n){try{z(n);}catch(n){t=n;}}),r.__H=void 0,t&&c.__e(t,r.__v));};var k="function"==typeof requestAnimationFrame;function w(n){var t,r=function(){clearTimeout(u),k&&cancelAnimationFrame(t),setTimeout(n);},u=setTimeout(r,35);k&&(t=requestAnimationFrame(r));}function z(n){var t=r$1,u=n.__c;"function"==typeof u&&(n.__c=void 0,u()),r$1=t;}function B(n){var t=r$1;n.__c=n.__(),r$1=t;}function C(n,t){return !n||n.length!==t.length||t.some(function(t,r){return t!==n[r]})}function D(n,t){return "function"==typeof t?t(n):t}
+
+	/**
+	 * @typedef {import('./PopupMenuProvider').PopupMenuStepEntry} PopupMenuStepEntry
+	 */
+
+	/**
+	 * Component that renders the popup menu navigation trail.
+	 *
+	 * @param {Object} props
+	 * @param {PopupMenuStepEntry[]} props.navigationStack
+	 * @param {(updater: (stack: PopupMenuStepEntry[]) => PopupMenuStepEntry[]) => void} props.setNavigationStack
+	 */
+	function PopupMenuBreadcrumbs(props) {
+	  const {
+	    navigationStack,
+	    setNavigationStack
+	  } = props;
+
+	  const breadcrumbs = T(() => {
+	    if (navigationStack.length <= 1) {
+	      return [];
+	    }
+
+	    return navigationStack.slice(0, -1).map((entry, index) => ({
+	      label: entry.label,
+	      onClick: () => setNavigationStack(stack => stack.slice(0, index + 1))
+	    }));
+	  }, [ navigationStack, setNavigationStack ]);
+
+	  const handleBackClick = navigationStack.length > 0 ? () => setNavigationStack([]) : null;
+	  const currentLabel = navigationStack.length > 0 ? navigationStack[navigationStack.length - 1].label : null;
+
+	  return m$1`
+    <div class="djs-popup-breadcrumbs">
+      ${ handleBackClick && m$1`
+        <button
+          type="button"
+          class="djs-popup-breadcrumbs-item djs-popup-breadcrumbs-item--back"
+          title="Back"
+          aria-label="Back"
+          onClick=${ handleBackClick }
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M8.03033 1.46967C8.32322 1.76256 8.32322 2.23744 8.03033 2.53033L4.56066 6L8.03033 9.46967C8.32322 9.76256 8.32322 10.2374 8.03033 10.5303C7.73744 10.8232 7.26256 10.8232 6.96967 10.5303L2.96967 6.53033C2.67678 6.23744 2.67678 5.76256 2.96967 5.46967L6.96967 1.46967C7.26256 1.17678 7.73744 1.17678 8.03033 1.46967Z" fill="currentColor"/>
+          </svg>
+        </button>
+      ` }
+      ${ breadcrumbs.map((crumb, i) => m$1`
+        <button
+          key=${ i }
+          type="button"
+          class="djs-popup-breadcrumbs-item"
+          onClick=${ crumb.onClick }
+          title=${ crumb.label }
+        >
+          ${ crumb.label }
+        </button>
+        <span class="djs-popup-breadcrumbs-item--separator" aria-hidden="true"></span>
+      `) }
+      ${ currentLabel && m$1`
+        <span class="djs-popup-breadcrumbs-item djs-popup-breadcrumbs-item--current" title=${ currentLabel }>
+          ${ currentLabel }
+        </span>
+      ` }
+    </div>
+  `;
+	}
 
 	function r(e){var t,f,n="";if("string"==typeof e||"number"==typeof e)n+=e;else if("object"==typeof e)if(Array.isArray(e)){var o=e.length;for(t=0;t<o;t++)e[t]&&(f=r(e[t]))&&(n&&(n+=" "),n+=f);}else for(f in e)e[f]&&(n&&(n+=" "),n+=f);return n}function clsx(){for(var e,t,f=0,n="",o=arguments.length;f<o;f++)(e=arguments[f])&&(t=r(e))&&(n&&(n+=" "),n+=t);return n}
 
 	/**
-	 * @typedef {import('./PopupMenuProvider').PopupMenuHeaderEntry} PopupMenuHeaderEntry
+	 * @typedef {import('./PopupMenuProvider.js').PopupMenuHeaderEntry} PopupMenuHeaderEntry
 	 */
 
 	/**
@@ -27696,7 +28900,7 @@
 	    title
 	  } = props;
 
-	  const groups = q(() => groupEntries$1(headerEntries), [ headerEntries ]);
+	  const groups = T(() => groupEntries$1(headerEntries), [ headerEntries ]);
 
 	  const isActionable = (entry) => {
 	    return entry.action && !entry.disabled;
@@ -27775,25 +28979,44 @@
 	}
 
 	/**
-	 * @typedef {import('./PopupMenuProvider').PopupMenuEntry} PopupMenuEntry
+	 * @typedef {import('./PopupMenuProvider.js').PopupMenuEntry} PopupMenuEntry
 	 */
+
+	/**
+	 * Compute the DOM `id` of a rendered popup menu entry.
+	 *
+	 * Used to wire the entry (`role="option"`) to the search field
+	 * via `aria-activedescendant`.
+	 *
+	 * @param {string} idPrefix
+	 * @param {PopupMenuEntry} entry
+	 *
+	 * @return {string}
+	 */
+	function getPopupMenuItemId(idPrefix, entry) {
+	  return `${ idPrefix }-entry-${ entry.id }`;
+	}
 
 	/**
 	 * Component that renders a popup menu entry.
 	 *
 	 * @param {Object} props
 	 * @param {string} props.key
+	 * @param {string} props.idPrefix
 	 * @param {PopupMenuEntry} props.entry
 	 * @param {boolean} props.selected
 	 * @param {(event: MouseEvent) => void} props.onMouseEnter
+	 * @param {(event: MouseEvent) => void} props.onMouseMove
 	 * @param {(event: MouseEvent) => void} props.onMouseLeave
 	 * @param {(event: MouseEvent, entry?: PopupMenuEntry, action?: string) => void} props.onAction
 	 */
 	function PopupMenuItem(props) {
 	  const {
+	    idPrefix,
 	    entry,
 	    selected,
 	    onMouseEnter,
+	    onMouseMove,
 	    onMouseLeave,
 	    onAction
 	  } = props;
@@ -27806,20 +29029,24 @@
 	    return onAction(event, entry, action);
 	  };
 
+	  const draggable = !entry.entries;
+
 	  return m$1`
     <li
       class=${ clsx('entry', { selected, disabled: entry.disabled }) }
       data-id=${ entry.id }
-      title=${ entry.title || entry.label }
+      id=${ getPopupMenuItemId(idPrefix, entry) }
+      role="option"
+      aria-selected=${ selected || undefined }
+      aria-haspopup=${ entry.entries ? 'true' : undefined }
+      title=${ entry.title }
       aria-disabled=${ entry.disabled || undefined }
-      tabIndex="0"
       onClick=${ handleClick }
-      onFocus=${ onMouseEnter }
-      onBlur=${ onMouseLeave }
       onMouseEnter=${ onMouseEnter }
+      onMouseMove=${ onMouseMove }
       onMouseLeave=${ onMouseLeave }
-      onDragStart=${ (event) => handleClick(event, 'dragstart') }
-      draggable=${ true }
+      onDragStart=${ (event) => draggable && handleClick(event, 'dragstart') }
+      draggable=${ draggable }
     >
       <div class="djs-popup-entry-content">
         <span
@@ -27837,25 +29064,36 @@
         ${ entry.description && m$1`
           <span
             class="djs-popup-entry-description"
-            title=${ entry.description }
           >
             ${ entry.description }
           </span>
         ` }
       </div>
-      ${ entry.documentationRef && m$1`
-        <div class="djs-popup-entry-docs">
-          <a
-            href="${ entry.documentationRef }"
-            onClick=${ (event) => event.stopPropagation() }
-            title="Open element documentation"
-            target="_blank"
-            rel="noopener"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path fill-rule="evenodd" clip-rule="evenodd" d="M10.6368 10.6375V5.91761H11.9995V10.6382C11.9995 10.9973 11.8623 11.3141 11.5878 11.5885C11.3134 11.863 10.9966 12.0002 10.6375 12.0002H1.36266C0.982345 12.0002 0.660159 11.8681 0.396102 11.6041C0.132044 11.34 1.52588e-05 11.0178 1.52588e-05 10.6375V1.36267C1.52588e-05 0.98236 0.132044 0.660173 0.396102 0.396116C0.660159 0.132058 0.982345 2.95639e-05 1.36266 2.95639e-05H5.91624V1.36267H1.36266V10.6375H10.6368ZM12 0H7.2794L7.27873 1.36197H9.68701L3.06507 7.98391L4.01541 8.93425L10.6373 2.31231V4.72059H12V0Z" fill="#818798"/>
-            </svg>
-          </a>
+      ${ (entry.documentationRef || entry.entries) && m$1`
+        <div class="djs-popup-entry-actions">
+          ${ entry.documentationRef && m$1`
+            <a
+              class="djs-popup-entry-docs"
+              href=${ entry.documentationRef }
+              onClick=${ (event) => event.stopPropagation() }
+              title="Open entry documentation"
+              tabIndex="-1"
+              aria-hidden="true"
+              target="_blank"
+              rel="noopener"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M10.6368 10.6375V5.91761H11.9995V10.6382C11.9995 10.9973 11.8623 11.3141 11.5878 11.5885C11.3134 11.863 10.9966 12.0002 10.6375 12.0002H1.36266C0.982345 12.0002 0.660159 11.8681 0.396102 11.6041C0.132044 11.34 1.52588e-05 11.0178 1.52588e-05 10.6375V1.36267C1.52588e-05 0.98236 0.132044 0.660173 0.396102 0.396116C0.660159 0.132058 0.982345 2.95639e-05 1.36266 2.95639e-05H5.91624V1.36267H1.36266V10.6375H10.6368ZM12 0H7.2794L7.27873 1.36197H9.68701L3.06507 7.98391L4.01541 8.93425L10.6373 2.31231V4.72059H12V0Z" fill="currentColor"/>
+              </svg>
+            </a>
+          ` }
+          ${ entry.entries && m$1`
+            <div class="djs-popup-entry-chevron" aria-hidden="true">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M3.96967 1.46967C4.26256 1.17678 4.73744 1.17678 5.03033 1.46967L9.03033 5.46967C9.32322 5.76256 9.32322 6.23744 9.03033 6.53033L5.03033 10.5303C4.73744 10.8232 4.26256 10.8232 3.96967 10.5303C3.67678 10.2374 3.67678 9.76256 3.96967 9.46967L7.43934 6L3.96967 2.53033C3.67678 2.23744 3.67678 1.76256 3.96967 1.46967Z" fill="currentColor"/>
+              </svg>
+            </div>
+          ` }
         </div>
       ` }
     </li>
@@ -27863,8 +29101,8 @@
 	}
 
 	/**
-	 * @typedef {import('./PopupMenuProvider').PopupMenuEntry} PopupMenuEntry
-	 * @typedef {import('./PopupMenuProvider').PopupMenuGroup} PopupMenuGroup
+	 * @typedef {import('./PopupMenuProvider.js').PopupMenuEntry} PopupMenuEntry
+	 * @typedef {import('./PopupMenuProvider.js').PopupMenuGroup} PopupMenuGroup
 	 */
 
 	/**
@@ -27874,19 +29112,37 @@
 	 * @param {PopupMenuGroup[]} props.groupedEntries
 	 * @param {PopupMenuEntry} props.selectedEntry
 	 * @param {(entry: PopupMenuEntry | null) => void} props.setSelectedEntry
+	 * @param {import('@bpmn-io/diagram-js-ui').Ref<boolean>} props.keyboardSelection
+	 * @param {() => void} props.onPointerInteraction
+	 * @param {string} props.idPrefix
+	 * @param {string} props.id
+	 * @param {string} [props.ariaLabel]
+	 * @param {number} [props.tabIndex]
+	 * @param {string} [props.ariaActivedescendant]
 	 */
 	function PopupMenuList(props) {
 	  const {
 	    selectedEntry,
 	    setSelectedEntry,
 	    groupedEntries,
+	    keyboardSelection,
+	    onPointerInteraction,
+	    idPrefix,
+	    id,
+	    ariaLabel,
+	    tabIndex,
+	    ariaActivedescendant,
 	    ...restProps
 	  } = props;
 
-	  const resultsRef = F();
+	  const resultsRef = A();
 
-	  // scroll to selected result
-	  A(() => {
+	  // scroll selected entry into view when navigating by keyboard
+	  _(() => {
+	    if (!keyboardSelection || !keyboardSelection.current) {
+	      return;
+	    }
+
 	    const containerEl = resultsRef.current;
 
 	    if (!containerEl)
@@ -27895,26 +29151,72 @@
 	    const selectedEl = containerEl.querySelector('.selected');
 
 	    if (selectedEl) {
-	      scrollIntoView(selectedEl);
+	      scrollIntoView$1(selectedEl);
 	    }
 	  }, [ selectedEntry ]);
 
+	  const handleMouseMove = () => {
+	    keyboardSelection.current = false;
+	    onPointerInteraction();
+	  };
+
+	  const handleEntryMouseMove = (entry) => {
+	    if (entry !== selectedEntry) {
+	      setSelectedEntry(entry);
+	    }
+	  };
+
+	  const handleEntryMouseEnter = (entry) => {
+
+	    // Prevents keyboard selection from being overridden
+	    // by mouse hover when `scrollIntoView` is called.
+	    if (keyboardSelection.current) {
+	      return;
+	    }
+
+	    setSelectedEntry(entry);
+	  };
+
+	  const handleEntryMouseLeave = () => {
+	    if (keyboardSelection.current) {
+	      return;
+	    }
+
+	    setSelectedEntry(null);
+	  };
+
 	  return m$1`
-    <div class="djs-popup-results" ref=${ resultsRef }>
+    <div
+      class="djs-popup-results"
+      ref=${ resultsRef }
+      id=${ id }
+      role="listbox"
+      aria-label=${ ariaLabel }
+      tabIndex=${ tabIndex }
+      aria-activedescendant=${ ariaActivedescendant }
+      onMouseMove=${ handleMouseMove }
+    >
       ${ groupedEntries.map(group => m$1`
         ${ group.name && m$1`
-          <div key=${ group.id } class="entry-header" title=${ group.name }>
+          <div key=${ group.id } id=${ getGroupHeaderId(idPrefix, group) } class="entry-header" title=${ group.name }>
             ${ group.name }
           </div>
         ` }
-        <ul class="djs-popup-group" data-group=${ group.id }>
+        <ul
+          class="djs-popup-group"
+          data-group=${ group.id }
+          role="group"
+          aria-labelledby=${ group.name ? getGroupHeaderId(idPrefix, group) : undefined }
+        >
           ${ group.entries.map(entry => m$1`
             <${PopupMenuItem}
               key=${ entry.id }
+              idPrefix=${ idPrefix }
               entry=${ entry }
               selected=${ entry === selectedEntry }
-              onMouseEnter=${ () => setSelectedEntry(entry) }
-              onMouseLeave=${ () => setSelectedEntry(null) }
+              onMouseEnter=${ () => handleEntryMouseEnter(entry) }
+              onMouseMove=${ () => handleEntryMouseMove(entry) }
+              onMouseLeave=${ handleEntryMouseLeave }
               ...${ restProps }
             />
           `) }
@@ -27927,7 +29229,11 @@
 
 	// helpers ////////////////
 
-	function scrollIntoView(el) {
+	function getGroupHeaderId(idPrefix, group) {
+	  return `${ idPrefix }-group-${ group.id }`;
+	}
+
+	function scrollIntoView$1(el) {
 	  if (typeof el.scrollIntoViewIfNeeded === 'function') {
 	    el.scrollIntoViewIfNeeded();
 	  } else {
@@ -27938,15 +29244,19 @@
 	  }
 	}
 
+	const ids$1 = new IdGenerator('djs-popup');
+
 	/**
-	 * @typedef {import('./PopupMenuProvider').PopupMenuEntry} PopupMenuEntry
-	 * @typedef {import('./PopupMenuProvider').PopupMenuHeaderEntry} PopupMenuHeaderEntry
-	 * @typedef {import('./PopupMenuProvider').PopupMenuEmptyPlaceholderProvider | import('./PopupMenuProvider').PopupMenuEmptyPlaceholder} PopupMenuEmptyPlaceholder
-	 * @typedef {import('./PopupMenuProvider').PopupMenuGroup} PopupMenuGroup
+	 * @typedef {import('./PopupMenuProvider.js').PopupMenuEntry} PopupMenuEntry
+	 * @typedef {import('./PopupMenuProvider.js').PopupMenuActionEntry} PopupMenuActionEntry
+	 * @typedef {import('./PopupMenuProvider.js').PopupMenuStepEntry} PopupMenuStepEntry
+	 * @typedef {import('./PopupMenuProvider.js').PopupMenuHeaderEntry} PopupMenuHeaderEntry
+	 * @typedef {import('./PopupMenuProvider.js').PopupMenuEmptyPlaceholderProvider | import('./PopupMenuProvider.js').PopupMenuEmptyPlaceholder} PopupMenuEmptyPlaceholder
+	 * @typedef {import('./PopupMenuProvider.js').PopupMenuGroup} PopupMenuGroup
 	 *
-	 * @typedef {import('../search/search').default} searchFn
+	 * @typedef {import('../search/search.js').default} searchFn
 	 *
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 */
 
 	/**
@@ -27963,8 +29273,9 @@
 	 * @param {string} [props.title]
 	 * @param {boolean} [props.search]
 	 * @param {PopupMenuEmptyPlaceholder} [props.emptyPlaceholder]
-	 * @param {number} [props.width]
+	 * @param {number|string} [props.width]
 	 * @param {searchFn} props.searchFn
+	 * @param {import('./PopupMenuProvider.js').PopupMenuTab} [props.defaultTab]
 	 */
 	function PopupMenuComponent(props) {
 	  const {
@@ -27979,60 +29290,287 @@
 	    search,
 	    emptyPlaceholder,
 	    searchFn,
-	    entries: originalEntries,
+	    entries,
 	    onOpened,
-	    onClosed
+	    onClosed,
+	    defaultTab
 	  } = props;
 
-	  const searchable = q(() => {
+	  /**
+	   * If a step entry (i.e. an entry with nested `entries`) is clicked,
+	   * it is pushed onto the stack to keep track of the navigation path.
+	   *
+	   * When the user clicks "Back" or a breadcrumb, the stack is popped.
+	   *
+	   * @type {[ PopupMenuStepEntry[], (stack: PopupMenuStepEntry[] | ((stack: PopupMenuStepEntry[]) => PopupMenuStepEntry[])) => void ]}
+	   */
+	  const [ navigationStack, setNavigationStack ] = d([]);
+
+	  /**
+	   * On `PopupMenu#refresh()` (i.e. when `entries` change)
+	   * the stack and active tab are reset to root.
+	   */
+	  y(() => {
+	    setNavigationStack([]);
+	    setActiveTab(null);
+	  }, [ entries ]);
+
+	  /**
+	   * Tabs partition root-level entries. They are derived from the entries'
+	   * `tab` property; entries without a `tab` belong to the default tab. The
+	   * tab strip only renders when at least two distinct tabs exist.
+	   *
+	   * @type {import('./PopupMenuProvider.js').PopupMenuTab[]}
+	   */
+	  const tabs = T(() => {
+	    const tabbed = [];
+	    const seen = new Set();
+
+	    let hasUntagged = false;
+
+	    entries.forEach(({ tab }) => {
+	      if (!tab) {
+	        hasUntagged = true;
+
+	        return;
+	      }
+
+	      if (!seen.has(tab.id)) {
+	        seen.add(tab.id);
+	        tabbed.push(tab);
+	      }
+	    });
+
+	    if (!tabbed.length) {
+	      return [];
+	    }
+
+	    // untagged entries need a tab to live in; without a configured
+	    // `defaultTab` there is no name to give it, so stay untabbed rather
+	    // than invent one
+	    if (hasUntagged && !defaultTab) {
+	      return [];
+	    }
+
+	    if (!hasUntagged) {
+	      return tabbed;
+	    }
+
+	    return [
+	      defaultTab,
+	      ...tabbed.filter(tab => tab.id !== defaultTab.id)
+	    ];
+	  }, [ entries, defaultTab ]);
+
+	  const [ activeTabOverride, setActiveTab ] = d(null);
+
+	  // the override may name a tab that no longer exists, e.g. on the render
+	  // following a `PopupMenu#refresh()` that dropped it
+	  const activeTabId = tabs.some(tab => tab.id === activeTabOverride)
+	    ? activeTabOverride
+	    : (tabs.length ? tabs[0].id : null);
+
+	  const tabsRef = A();
+
+	  _(() => {
+	    const tabsEl = tabsRef.current;
+
+	    if (!tabsEl) {
+	      return;
+	    }
+
+	    const activeTabEl = tabsEl.querySelector('[aria-selected="true"]');
+
+	    if (activeTabEl) {
+	      scrollIntoView(activeTabEl);
+	    }
+	  }, [ activeTabId ]);
+
+	  /**
+	   * Which directions the tab strip can still be scrolled in. Drives the
+	   * scroll controls, so they only show when there is somewhere to scroll.
+	   *
+	   * @type {[ { start: boolean, end: boolean }, (overflow: { start: boolean, end: boolean }) => void ]}
+	   */
+	  const [ overflow, setOverflow ] = d({ start: false, end: false });
+
+	  // only ever called while the strip is rendered, so the ref is set
+	  const updateOverflow = q(() => {
+	    const { scrollLeft, scrollWidth, clientWidth } = tabsRef.current;
+
+	    setOverflow({
+	      start: scrollLeft > 0,
+
+	      // sub-pixel widths leave a fractional remainder at the end
+	      end: scrollWidth - clientWidth - scrollLeft > 1
+	    });
+	  }, []);
+
+	  // horizontal scroll on tabs
+	  const handleWheel = q(event => {
+	    const tabsEl = tabsRef.current;
+
+	    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+	      ? event.deltaX
+	      : event.deltaY;
+
+	    if (!delta) {
+	      return;
+	    }
+
+	    const { scrollLeft, scrollWidth, clientWidth } = tabsEl;
+
+	    if (scrollWidth - clientWidth < 1) {
+	      return;
+	    }
+
+	    event.preventDefault();
+
+	    tabsEl.scrollLeft = scrollLeft + delta;
+
+	    updateOverflow();
+	  }, [ updateOverflow ]);
+
+	  _(() => {
+	    const tabsEl = tabsRef.current;
+
+	    if (!tabsEl) {
+	      return;
+	    }
+
+	    updateOverflow();
+
+	    tabsEl.addEventListener('scroll', updateOverflow);
+	    tabsEl.addEventListener('wheel', handleWheel, { passive: false });
+
+	    return () => {
+	      tabsEl.removeEventListener('scroll', updateOverflow);
+	      tabsEl.removeEventListener('wheel', handleWheel);
+	    };
+	  }, [ tabs, activeTabId, updateOverflow, handleWheel ]);
+
+	  /**
+	   * Scroll the nearest tab that is cut off in `direction` into view, so a
+	   * click always lands on a fully visible tab.
+	   *
+	   * @param {number} direction
+	   */
+	  const scrollTabs = q(direction => {
+	    const tabsEl = tabsRef.current;
+
+	    const tabEls = direction > 0
+	      ? [ ...tabsEl.children ]
+	      : [ ...tabsEl.children ].reverse();
+
+	    const stripBounds = tabsEl.getBoundingClientRect();
+
+	    const cutOff = tabEls.find(tabEl => {
+	      const bounds = tabEl.getBoundingClientRect();
+
+	      return direction > 0
+	        ? bounds.right > stripBounds.right + 1
+	        : bounds.left < stripBounds.left - 1;
+	    });
+
+	    if (cutOff) {
+	      scrollIntoView(cutOff);
+
+	      // recompute directly: a programmatic scroll does not reliably emit a
+	      // `scroll` event, so the controls would otherwise go stale
+	      updateOverflow();
+	    }
+	  }, [ updateOverflow ]);
+
+	  const getEntryTabId = q(entry => {
+	    return (entry.tab && entry.tab.id) || (defaultTab && defaultTab.id);
+	  }, [ defaultTab ]);
+
+	  const [ searchValue, setSearchValue ] = d('');
+	  const isSearching = searchValue.trim().length > 0;
+
+	  const actionableEntries = T(() => getActionableEntries(entries), [ entries ]);
+
+	  const searchable = T(() => {
 	    if (!isDefined(search)) {
 	      return false;
 	    }
 
-	    return originalEntries.length > 5;
-	  }, [ search, originalEntries ]);
+	    return actionableEntries.length > 5;
+	  }, [ search, actionableEntries ]);
 
-	  const [ searchValue, setSearchValue ] = p('');
+	  const entriesToShow = T(() => {
 
-	  const filterEntries = x((originalEntries, searchValue) => {
+	    // the tab filter applies at the root level only; drill-down
+	    // (step entries) and search operate on the full entry set
+	    const availableEntries = navigationStack.length
+	      ? navigationStack[navigationStack.length - 1].entries
+	      : (
+	        tabs.length > 1
+	          ? entries.filter(entry => getEntryTabId(entry) === activeTabId)
+	          : entries
+	      );
 
-	    if (!searchable) {
-	      return originalEntries;
+	    if (!searchable) return availableEntries;
+
+	    if (isSearching) {
+	      return searchFn(
+	        actionableEntries.filter(({ searchable }) => searchable !== false),
+	        searchValue,
+	        { keys: [ 'label', 'search', 'description' ] }
+	      ).map(({ item }) => item);
 	    }
 
-	    if (!searchValue.trim()) {
-	      return originalEntries.filter(({ rank = 0 }) => rank >= 0);
+	    return availableEntries.filter(({ rank = 0 }) => rank >= 0);
+	  }, [ searchable, isSearching, actionableEntries, searchValue, searchFn, navigationStack, entries, tabs, activeTabId, getEntryTabId ]);
+
+	  const groupedEntries = T(() => {
+	    if (isSearching) {
+	      return entriesToShow.length ? [ { id: 'default', entries: entriesToShow } ] : [];
 	    }
 
-	    const searchableEntries = originalEntries.filter(({ searchable }) => searchable !== false);
+	    return groupEntries(entriesToShow);
+	  }, [ entriesToShow, isSearching ]);
 
-	    return searchFn(searchableEntries, searchValue, {
-	      keys: [
-	        'label',
-	        'search',
-	        'description'
-	      ]
-	    }).map(({ item }) => item);
-	  }, [ searchable ]);
+	  const [ selectedEntry, setSelectedEntry ] = d(entriesToShow[0]);
+	  const restoreSelection = A(null);
 
-	  const entries = q(() => filterEntries(originalEntries, searchValue), [ originalEntries, searchValue, filterEntries ]);
-	  const [ selectedEntry, setSelectedEntry ] = p(entries[0]);
+	  /**
+	   * Whether the current selection was made through keyboard navigation.
+	   *
+	   * @type {import('@bpmn-io/diagram-js-ui').Ref<boolean>}
+	   */
+	  const keyboardSelection = A(false);
 
-	  const groupedEntries = q(() => {
-	    if (searchValue.trim()) {
-	      return entries.length ? [ { id: 'default', entries } ] : [];
+	  const [ interactionMode, setInteractionMode ] = d('keyboard');
+
+	  const handleKeyboardInteraction = q(() => {
+	    setInteractionMode('keyboard');
+	  }, []);
+
+	  const handlePointerInteraction = q(() => {
+	    setInteractionMode('pointer');
+	  }, []);
+
+	  // per instance basis to generate field IDs
+	  const idPrefix = T(() => ids$1.next(), []);
+
+	  const resultsId = `${ idPrefix }-results`;
+	  const activeDescendantId = selectedEntry && getPopupMenuItemId(idPrefix, selectedEntry);
+
+	  y(() => {
+	    const restore = restoreSelection.current;
+
+	    if (restore && entriesToShow.includes(restore)) {
+	      setSelectedEntry(restore);
+	    } else {
+	      setSelectedEntry(entriesToShow[0]);
 	    }
 
-	    return groupEntries(entries);
-	  }, [ entries, searchValue ]);
-
-	  // always select first entry when filtered entries change
-	  _(() => {
-	    setSelectedEntry(entries[0]);
-	  }, [ entries ]);
+	    restoreSelection.current = null;
+	  }, [ entriesToShow ]);
 
 	  // handle keyboard selection
-	  const keyboardSelect = x(direction => {
+	  const keyboardSelect = q(direction => {
 	    const entries = getOrderedEntries(groupedEntries);
 	    const idx = entries.indexOf(selectedEntry);
 
@@ -28046,16 +29584,65 @@
 	      nextIdx = 0;
 	    }
 
-	    setSelectedEntry(entries[nextIdx]);
-	  }, [ groupedEntries, selectedEntry, setSelectedEntry ]);
+	    keyboardSelection.current = true;
 
-	  const handleKeyDown = x(event => {
+	    setSelectedEntry(entries[nextIdx]);
+	  }, [ groupedEntries, selectedEntry ]);
+
+	  const keyboardDrilldown = q((direction) => {
+	    if (direction > 0 && selectedEntry && selectedEntry.entries) {
+	      keyboardSelection.current = true;
+
+	      setNavigationStack(stack => [ ...stack, selectedEntry ]);
+	    }
+
+	    if (direction < 0 && navigationStack.length > 0) {
+	      keyboardSelection.current = true;
+
+	      restoreSelection.current = navigationStack[navigationStack.length + direction];
+	      setNavigationStack(stack => stack.slice(0, direction));
+	    }
+	  }, [ selectedEntry, navigationStack ]);
+
+	  const handleEntryAction = q((event, entry, action) => {
+	    if (!entry || entry.disabled) {
+	      return;
+	    }
+
+	    if (entry.entries) {
+	      event.preventDefault();
+	      return keyboardDrilldown(1);
+	    }
+
+	    return onSelect(event, entry, action);
+	  }, [ onSelect, keyboardDrilldown ]);
+
+	  const handleKeyDown = q(event => {
 	    if (event.key === 'Enter' && selectedEntry) {
+	      const target = event.target;
+	      const isNativeActionTarget = !!closest(target, 'a, button', true);
+
+	      // let native controls handle <Enter> themselves
+	      if (isNativeActionTarget) {
+	        return;
+	      }
+
 	      if (selectedEntry.disabled) {
 	        return;
 	      }
 
-	      return onSelect(event, selectedEntry);
+	      return handleEntryAction(event, selectedEntry);
+	    }
+
+	    // BACKSPACE
+	    if (event.key === 'Backspace') {
+	      const target = event.target;
+	      const isEditingSearch = matches(target, 'input') && target.value !== '';
+
+	      if (!isEditingSearch) {
+	        keyboardDrilldown(-1);
+	        return event.preventDefault();
+	      }
 	    }
 
 	    // ARROW_UP
@@ -28071,15 +29658,98 @@
 
 	      return event.preventDefault();
 	    }
-	  }, [ onSelect, selectedEntry, keyboardSelect ]);
 
-	  const handleKey = x(event => {
+	    // ARROW_RIGHT
+	    if (event.key === 'ArrowRight') {
+	      keyboardDrilldown(1);
+	      return event.preventDefault();
+	    }
+
+	    // ARROW_LEFT
+	    if (event.key === 'ArrowLeft') {
+	      keyboardDrilldown(-1);
+	      return event.preventDefault();
+	    }
+	  }, [ selectedEntry, keyboardSelect, keyboardDrilldown, handleEntryAction ]);
+
+	  const selectTab = q((event, tabId) => {
+	    setActiveTab(tabId);
+
+	    // a keyboard activation reports no click detail; keep focus in the strip
+	    // so arrow navigation keeps working. A pointer click hands focus back to
+	    // the search input so typing continues to work
+	    if (!event.detail) {
+	      return;
+	    }
+
+	    const popupEl = closest(event.currentTarget, '.djs-popup', true);
+	    const inputEl = popupEl && popupEl.querySelector('input');
+
+	    inputEl && inputEl.focus();
+	  }, []);
+
+	  // left/right/Home/End navigate between tabs while the strip has focus; stop
+	  // propagation so the global drill-down and entry-action bindings do not fire.
+	  // Up/down leave the strip instead
+	  const handleTabKeyDown = q(event => {
+	    if (event.key === 'Enter' || event.key === ' ') {
+
+	      // let the button's native click happen, but keep the event
+	      // from reaching the global Enter handler (entry action)
+	      event.stopPropagation();
+
+	      return;
+	    }
+
+	    // <ArrowDown> / <ArrowUp> hand focus to the panel so the menu's own
+	    // bindings take over — notably <ArrowRight> to step into an entry, which
+	    // would otherwise keep switching tabs. The event still bubbles, so the
+	    // selection moves on the same keystroke
+	    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+	      const popupEl = closest(event.currentTarget, '.djs-popup', true);
+
+	      const focusEl = popupEl.querySelector('input')
+	        || popupEl.querySelector('[role="listbox"]');
+
+	      focusEl && focusEl.focus();
+
+	      return;
+	    }
+
+	    const idx = tabs.findIndex(tab => tab.id === activeTabId);
+
+	    let nextIdx;
+
+	    if (event.key === 'ArrowLeft') {
+	      nextIdx = (idx - 1 + tabs.length) % tabs.length;
+	    } else if (event.key === 'ArrowRight') {
+	      nextIdx = (idx + 1) % tabs.length;
+	    } else if (event.key === 'Home') {
+	      nextIdx = 0;
+	    } else if (event.key === 'End') {
+	      nextIdx = tabs.length - 1;
+	    } else {
+	      return;
+	    }
+
+	    event.preventDefault();
+	    event.stopPropagation();
+
+	    setActiveTab(tabs[nextIdx].id);
+
+	    const strip = event.currentTarget.parentNode;
+	    const nextButton = strip && strip.children[nextIdx];
+
+	    nextButton && nextButton.focus();
+	  }, [ tabs, activeTabId ]);
+
+	  const handleKey = q(event => {
 	    if (matches(event.target, 'input')) {
 	      setSearchValue(() => event.target.value);
 	    }
 	  }, [ setSearchValue ]);
 
-	  _(() => {
+	  y(() => {
 	    onOpened();
 
 	    return () => {
@@ -28087,7 +29757,9 @@
 	    };
 	  }, []);
 
-	  const displayHeader = q(() => title || headerEntries.length > 0, [ title, headerEntries ]);
+	  const displayBreadcrumbs = !isSearching && navigationStack.length > 0;
+	  const displayTabs = tabs.length > 1 && !isSearching && navigationStack.length === 0;
+	  const displayHeader = (title || headerEntries.length > 0) && !displayBreadcrumbs;
 
 	  return m$1`
     <${PopupMenuWrapper}
@@ -28098,6 +29770,9 @@
       position=${ position }
       width=${ width }
       scale=${ scale }
+      navigationStack=${ navigationStack }
+      interactionMode=${ interactionMode }
+      onKeyboardInteraction=${ handleKeyboardInteraction }
     >
       ${ displayHeader && m$1`
         <${PopupMenuHeader}
@@ -28108,7 +29783,13 @@
           title=${ title }
         />
       ` }
-      ${ originalEntries.length > 0 && m$1`
+      ${ displayBreadcrumbs && m$1`
+        <${PopupMenuBreadcrumbs}
+          navigationStack=${navigationStack}
+          setNavigationStack=${ setNavigationStack }
+        />
+      ` }
+      ${ entries.length > 0 && m$1`
         <div class="djs-popup-body">
 
           ${ searchable && m$1`
@@ -28116,23 +29797,113 @@
             <svg class="djs-popup-search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path fill-rule="evenodd" clip-rule="evenodd" d="M9.0325 8.5H9.625L13.3675 12.25L12.25 13.3675L8.5 9.625V9.0325L8.2975 8.8225C7.4425 9.5575 6.3325 10 5.125 10C2.4325 10 0.25 7.8175 0.25 5.125C0.25 2.4325 2.4325 0.25 5.125 0.25C7.8175 0.25 10 2.4325 10 5.125C10 6.3325 9.5575 7.4425 8.8225 8.2975L9.0325 8.5ZM1.75 5.125C1.75 6.9925 3.2575 8.5 5.125 8.5C6.9925 8.5 8.5 6.9925 8.5 5.125C8.5 3.2575 6.9925 1.75 5.125 1.75C3.2575 1.75 1.75 3.2575 1.75 5.125Z" fill="#22242A"/>
             </svg>
-            <input type="text" spellcheck=${ false } aria-label="${ title }" />
+            <input
+              type="text"
+              spellcheck=${ false }
+              role="combobox"
+              aria-label="${ title || 'Search' }"
+              aria-expanded="true"
+              aria-controls=${ resultsId }
+              aria-activedescendant=${ activeDescendantId || undefined }
+              aria-autocomplete="list"
+            />
           </div>
+          ` }
+
+          ${ displayTabs && m$1`
+            <div class="djs-popup-tabs-container">
+              <div class="djs-popup-tabs" ref=${ tabsRef } role="tablist">
+                ${ tabs.map(tab => m$1`
+                  <button
+                    type="button"
+                    class="djs-popup-tab"
+                    role="tab"
+                    title=${ tab.title || undefined }
+                    aria-controls=${ resultsId }
+                    aria-selected=${ tab.id === activeTabId }
+                    tabIndex=${ tab.id === activeTabId ? 0 : -1 }
+                    onClick=${ (event) => selectTab(event, tab.id) }
+                    onKeydown=${ handleTabKeyDown }
+                  >${ tab.label }</button>
+                `) }
+              </div>
+
+              ${ /* outside the tablist: its children must be tabs. Keyboard
+                     users navigate with the arrow keys instead */ '' }
+              ${ [ -1, 1 ].map(direction => (direction < 0 ? overflow.start : overflow.end) && m$1`
+                <button
+                  type="button"
+                  class=${ `djs-popup-tabs-scroll djs-popup-tabs-scroll-${ direction < 0 ? 'start' : 'end' }` }
+                  aria-hidden="true"
+                  tabIndex="-1"
+                  onMousedown=${ (event) => event.preventDefault() }
+                  onClick=${ () => scrollTabs(direction) }
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path fill-rule="evenodd" clip-rule="evenodd" d="M3.96967 1.46967C4.26256 1.17678 4.73744 1.17678 5.03033 1.46967L9.03033 5.46967C9.32322 5.76256 9.32322 6.23744 9.03033 6.53033L5.03033 10.5303C4.73744 10.8232 4.26256 10.8232 3.96967 10.5303C3.67678 10.2374 3.67678 9.76256 3.96967 9.46967L7.43934 6L3.96967 2.53033C3.67678 2.23744 3.67678 1.76256 3.96967 1.46967Z" fill="currentColor"/>
+                  </svg>
+                </button>
+              `) }
+            </div>
+          ` }
+
+          ${ isSearching && m$1`
+            <div class="djs-popup-search-count" aria-live="polite">
+              ${ entriesToShow.length } ${ entriesToShow.length === 1 ? 'result' : 'results' } found
+            </div>
           ` }
 
           <${PopupMenuList}
             groupedEntries=${ groupedEntries }
             selectedEntry=${ selectedEntry }
             setSelectedEntry=${ setSelectedEntry }
-            onAction=${ onSelect }
+            keyboardSelection=${ keyboardSelection }
+            onPointerInteraction=${ handlePointerInteraction }
+            onAction=${ handleEntryAction }
+            idPrefix=${ idPrefix }
+            id=${ resultsId }
+            ariaLabel=${ title || 'Results' }
+            tabIndex=${ searchable ? -1 : 0 }
+            ariaActivedescendant=${ searchable ? undefined : (activeDescendantId || undefined) }
           />
+
+          ${ selectedEntry && selectedEntry.documentationRef && m$1`
+            <div class="djs-popup-footer">
+              <a
+                class="djs-popup-footer-docs"
+                href=${ selectedEntry.documentationRef }
+                onClick=${ (event) => event.stopPropagation() }
+                aria-label=${ selectedEntry.label ? `Open entry documentation for ${ selectedEntry.label }` : 'Open entry documentation' }
+                target="_blank"
+                rel="noopener"
+              >
+                Open entry documentation
+
+                <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M10.6368 10.6375V5.91761H11.9995V10.6382C11.9995 10.9973 11.8623 11.3141 11.5878 11.5885C11.3134 11.863 10.9966 12.0002 10.6375 12.0002H1.36266C0.982345 12.0002 0.660159 11.8681 0.396102 11.6041C0.132044 11.34 1.52588e-05 11.0178 1.52588e-05 10.6375V1.36267C1.52588e-05 0.98236 0.132044 0.660173 0.396102 0.396116C0.660159 0.132058 0.982345 2.95639e-05 1.36266 2.95639e-05H5.91624V1.36267H1.36266V10.6375H10.6368ZM12 0H7.2794L7.27873 1.36197H9.68701L3.06507 7.98391L4.01541 8.93425L10.6373 2.31231V4.72059H12V0Z" fill="#818798"/>
+                </svg>
+              </a>
+            </div>
+          ` }
         </div>
       ` }
-    ${ emptyPlaceholder && entries.length === 0 && m$1`
+    ${ emptyPlaceholder && entriesToShow.length === 0 && m$1`
       <div class="djs-popup-no-results">${ isFunction(emptyPlaceholder) ? emptyPlaceholder(searchValue) : emptyPlaceholder }</div>
     ` }
     </${PopupMenuWrapper}>
   `;
+	}
+
+	function scrollIntoView(el) {
+	  if (typeof el.scrollIntoViewIfNeeded === 'function') {
+	    el.scrollIntoViewIfNeeded();
+	  } else {
+	    el.scrollIntoView({
+	      scrollMode: 'if-needed',
+	      block: 'nearest',
+	      inline: 'nearest'
+	    });
+	  }
 	}
 
 	/**
@@ -28145,15 +29916,18 @@
 	    onClose,
 	    onKeydown,
 	    onKeyup,
+	    onKeyboardInteraction,
 	    className,
 	    children,
+	    navigationStack,
+	    interactionMode,
 	    position: positionGetter
 	  } = props;
 
-	  const popupRef = F();
+	  const popupRef = A();
 
 	  // initial position
-	  A(() => {
+	  _(() => {
 	    if (typeof positionGetter !== 'function') {
 	      return;
 	    }
@@ -28165,21 +29939,25 @@
 	    popupEl.style.top = `${position.y}px`;
 	  }, [ popupRef.current, positionGetter ]);
 
-	  // initial focus
-	  A(() => {
+	  _(() => {
 	    const popupEl = popupRef.current;
 
 	    if (!popupEl) {
 	      return;
 	    }
 
-	    const inputEl = popupEl.querySelector('input');
+	    // focus the combobox (search) if present, otherwise the listbox
+	    // itself which then holds focus + `aria-activedescendant`;
+	    // fall back to the popup element (e.g. empty placeholder)
+	    const focusEl = popupEl.querySelector('input')
+	      || popupEl.querySelector('[role="listbox"]')
+	      || popupEl;
 
-	    (inputEl || popupEl).focus();
-	  }, []);
+	    focusEl.focus();
+	  }, [ navigationStack ]);
 
 	  // global <Escape> / blur handlers
-	  _(() => {
+	  y(() => {
 	    const handleKeyDown = event => {
 	      if (event.key === 'Escape') {
 	        event.preventDefault();
@@ -28199,18 +29977,26 @@
 	    };
 
 	    document.documentElement.addEventListener('keydown', handleKeyDown);
-	    document.body.addEventListener('click', handleClick);
+
+	    // use capture phase so containment is evaluated before an entry
+	    // or the popup menu is potentially unmounted
+	    document.body.addEventListener('click', handleClick, true);
 
 	    return () => {
 	      document.documentElement.removeEventListener('keydown', handleKeyDown);
-	      document.body.removeEventListener('click', handleClick);
+	      document.body.removeEventListener('click', handleClick, true);
 	    };
 	  }, []);
 
+	  const popupClassName = clsx('djs-popup', className, {
+	    'djs-popup--pointer': interactionMode === 'pointer'
+	  });
+
 	  return m$1`
     <div
-      class=${ clsx('djs-popup', className) }
+      class=${ popupClassName }
       style=${ getPopupStyle(props) }
+      onKeydownCapture=${ onKeyboardInteraction }
       onKeydown=${ onKeydown }
       onKeyup=${ onKeyup }
       ref=${ popupRef }
@@ -28225,9 +30011,14 @@
 	// helpers //////////////////////
 
 	function getPopupStyle(props) {
+	  const { width } = props;
+
+	  const normalizedWidth = typeof width === 'number' ? `${width}px` : width;
+
 	  return {
 	    transform: `scale(${props.scale})`,
-	    width: `${props.width}px`,
+	    width: isDefined(width) ? normalizedWidth : undefined,
+	    maxWidth: isDefined(width) ? 'unset' : undefined,
 	    'transform-origin': 'top left'
 	  };
 	}
@@ -28242,6 +30033,34 @@
 	  });
 
 	  return entries;
+	}
+
+	/**
+	 * Get a flat list of entries that are actionable, i.e. that do not have nested `entries`.
+	 *
+	 * Walk the entry tree following `entries` and return a flat list of leaves.
+	 *
+	 * @param {PopupMenuEntry[]} entries
+	 *
+	 * @return {PopupMenuActionEntry[]}
+	 */
+	function getActionableEntries(entries) {
+	  const leaves = [];
+
+	  function walk(entries) {
+	    entries.forEach(entry => {
+	      if (entry.entries) {
+	        walk(entry.entries);
+	        return;
+	      }
+
+	      leaves.push(entry);
+	    });
+	  }
+
+	  walk(entries);
+
+	  return leaves;
 	}
 
 	/**
@@ -28276,25 +30095,28 @@
 	}
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../search/search').default} search
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../search/search.js').default} search
 	 *
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 *
-	 * @typedef {import('./PopupMenuProvider').PopupMenuEntries} PopupMenuEntries
-	 * @typedef {import('./PopupMenuProvider').PopupMenuEntry} PopupMenuEntry
-	 * @typedef {import('./PopupMenuProvider').PopupMenuHeaderEntries} PopupMenuHeaderEntries
-	 * @typedef {import('./PopupMenuProvider').PopupMenuHeaderEntry} PopupMenuHeaderEntry
-	 * @typedef {import('./PopupMenuProvider').default} PopupMenuProvider
+	 * @typedef {import('./PopupMenuProvider.js').PopupMenuEntries} PopupMenuEntries
+	 * @typedef {import('./PopupMenuProvider.js').PopupMenuEntry} PopupMenuEntry
+	 * @typedef {import('./PopupMenuProvider.js').PopupMenuHeaderEntries} PopupMenuHeaderEntries
+	 * @typedef {import('./PopupMenuProvider.js').PopupMenuHeaderEntry} PopupMenuHeaderEntry
+	 * @typedef {import('./PopupMenuProvider.js').default} PopupMenuProvider
 	 *
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../model/Types.js').Element} Element
+	 *
+	 * @typedef {import('./PopupMenuProvider.js').PopupMenuTab} PopupMenuTab
 	 *
 	 * @typedef { {
 	 *   scale?: {
 	 *     min?: number;
 	 *     max?: number;
 	 *   } | boolean;
+	 *   defaultTab?: PopupMenuTab;
 	 * } } PopupMenuConfig
 	 *
 	 * @typedef {Element|Element[]} PopupMenuTarget;
@@ -28331,7 +30153,8 @@
 	  };
 
 	  this._config = {
-	    scale: scale
+	    scale: scale,
+	    defaultTab: config && config.defaultTab
 	  };
 
 
@@ -28368,9 +30191,7 @@
 	    options
 	  } = this._current;
 
-	  const entriesArray = Object.entries(entries).map(
-	    ([ key, value ]) => ({ id: key, ...value })
-	  );
+	  const entriesArray = flattenEntries(entries);
 
 	  const headerEntriesArray = Object.entries(headerEntries).map(
 	    ([ key, value ]) => ({ id: key, ...value })
@@ -28385,7 +30206,7 @@
 	  const onClose = result => this.close(result);
 	  const onSelect = (event, entry, action) => this.trigger(event, entry, action);
 
-	  q$1(
+	  R(
 	    m$1`
       <${PopupMenuComponent}
         onClose=${ onClose }
@@ -28399,6 +30220,7 @@
         onOpened=${ this._onOpened.bind(this) }
         onClosed=${ this._onClosed.bind(this) }
         searchFn=${ this._search }
+        defaultTab=${ this._config.defaultTab }
         ...${{ ...options }}
       />
     `,
@@ -28426,6 +30248,15 @@
 
 	  if (!position) {
 	    throw new Error('position is missing');
+	  }
+
+	  var allowed = this._eventBus.fire('popupMenu.open.allowed', {
+	    target: target,
+	    providerId: providerId
+	  });
+
+	  if (allowed === false) {
+	    return;
 	  }
 
 	  if (this.isOpen()) {
@@ -28531,7 +30362,7 @@
 	PopupMenu.prototype.reset = function() {
 	  const container = this._current.container;
 
-	  q$1(null, container);
+	  R(null, container);
 
 	  remove$2(container);
 	};
@@ -28689,7 +30520,6 @@
 	 * @param {string} id
 	 * @param {PopupMenuProvider} provider
 	 */
-
 	/**
 	 * Register a popup menu provider with the given priority. See
 	 * {@link PopupMenuProvider} for examples.
@@ -28885,6 +30715,49 @@
 
 	  return entry;
 	};
+
+
+	/**
+	 * Convert a `PopupMenuEntries` record into an array of entries with their id
+	 * spliced in. Recurses into step entries so the whole tree uses the array
+	 * shape downstream.
+	 *
+	 * Leaf entries inherit the `search` terms of their ancestors, so a leaf can be
+	 * found by keywords declared on any of its parents.
+	 *
+	 * @param {import('./PopupMenuProvider').PopupMenuEntries} entriesMap
+	 * @param {string[]} [search]
+	 *
+	 * @return {import('./PopupMenuProvider').PopupMenuEntry[]}
+	 */
+	function flattenEntries(entriesMap, search = []) {
+	  return Object.entries(entriesMap).map(([ id, value ]) => {
+	    const entry = { id, ...value };
+
+	    if (entry.entries) {
+	      entry.entries = flattenEntries(
+	        entry.entries,
+	        [ ...search, ...asArray(entry.search) ]
+	      );
+	    } else if (search.length) {
+	      entry.search = [ ...search, ...asArray(entry.search) ];
+	    }
+
+	    return entry;
+	  });
+	}
+
+	/**
+	 * @param {string | string[]} [value]
+	 * @return {string[]}
+	 */
+	function asArray(value) {
+	  if (!value) {
+	    return [];
+	  }
+
+	  return isArray$2(value) ? value : [ value ];
+	}
 
 	/**
 	 * @typedef { {
@@ -29352,7 +31225,7 @@
 	 * @typedef {import('diagram-js/lib/features/context-pad/ContextPadProvider').default<Element>} ContextPadProvider
 	 */
 
-	var LOW_PRIORITY$m = 900;
+	var LOW_PRIORITY$o = 900;
 
 	/**
 	 * A provider for the `Align elements` context pad entry.
@@ -29366,7 +31239,7 @@
 	 */
 	function AlignElementsContextPadProvider(contextPad, popupMenu, translate, canvas) {
 
-	  contextPad.registerProvider(LOW_PRIORITY$m, this);
+	  contextPad.registerProvider(LOW_PRIORITY$o, this);
 
 	  this._contextPad = contextPad;
 	  this._popupMenu = popupMenu;
@@ -29536,7 +31409,7 @@
 	};
 
 	/**
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 */
 
 	/**
@@ -29557,7 +31430,7 @@
 
 	RuleProvider.$inject = [ 'eventBus' ];
 
-	e$2(RuleProvider, CommandInterceptor);
+	e$3(RuleProvider, CommandInterceptor);
 
 
 	/**
@@ -29642,7 +31515,7 @@
 
 	BpmnAlignElements.$inject = [ 'eventBus' ];
 
-	e$2(BpmnAlignElements, RuleProvider);
+	e$3(BpmnAlignElements, RuleProvider);
 
 	BpmnAlignElements.prototype.init = function() {
 	  this.addRule('elements.align', function(context) {
@@ -29681,11 +31554,11 @@
 	};
 
 	/**
-	 * @typedef {import('../../model/Types').Connection} Connection
-	 * @typedef {import('../../model/Types').Element} Element
-	 * @typedef {import('../../model/Types').Shape} Shape
+	 * @typedef {import('../../model/Types.js').Connection} Connection
+	 * @typedef {import('../../model/Types.js').Element} Element
+	 * @typedef {import('../../model/Types.js').Shape} Shape
 	 *
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 */
 
 	// padding to detect element placement
@@ -29987,16 +31860,16 @@
 	}
 
 	/**
-	 * @typedef {import('../../core/Types').ShapeLike} Shape
+	 * @typedef {import('../../core/Types.js').ShapeLike} Shape
 	 *
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../modeling/Modeling').default} Modeling
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
 	 */
 
-	var LOW_PRIORITY$l = 100;
+	var LOW_PRIORITY$n = 100;
 
 
 	/**
@@ -30009,7 +31882,7 @@
 	 */
 	function AutoPlace$1(eventBus, modeling, canvas) {
 
-	  eventBus.on('autoPlace', LOW_PRIORITY$l, function(context) {
+	  eventBus.on('autoPlace', LOW_PRIORITY$n, function(context) {
 	    var shape = context.shape,
 	        source = context.source;
 
@@ -30091,8 +31964,8 @@
 	}
 
 	/**
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../selection/Selection').default} Selection
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../selection/Selection.js').default} Selection
 	 */
 
 	/**
@@ -30437,17 +32310,17 @@
 	};
 
 	/**
-	 * @typedef {import('../../model/Types').Element} Element
-	 * @typedef {import('../../model/Types').Shape} Shape
+	 * @typedef {import('../../model/Types.js').Element} Element
+	 * @typedef {import('../../model/Types.js').Shape} Shape
 	 *
-	 * @typedef {import('../../util/Types').Direction} Direction
-	 * @typedef {import('../../util/Types').Rect} Rect
-	 * @typedef {import('../../util/Types').RectTRBL} RectTRBL
+	 * @typedef {import('../../util/Types.js').Direction} Direction
+	 * @typedef {import('../../util/Types.js').Rect} Rect
+	 * @typedef {import('../../util/Types.js').RectTRBL} RectTRBL
 	 *
-	 * @typedef {import('../../core/ElementRegistry').default} ElementRegistry
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../modeling/Modeling').default} Modeling
-	 * @typedef {import('../rules/Rules').default} Rules
+	 * @typedef {import('../../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
+	 * @typedef {import('../rules/Rules.js').default} Rules
 	 */
 
 	/**
@@ -30550,7 +32423,7 @@
 	  'rules'
 	];
 
-	e$2(AutoResize, CommandInterceptor);
+	e$3(AutoResize, CommandInterceptor);
 
 
 	/**
@@ -30739,7 +32612,7 @@
 	  'injector'
 	];
 
-	e$2(BpmnAutoResize, AutoResize);
+	e$3(BpmnAutoResize, AutoResize);
 
 	/**
 	 * Perform BPMN-specific resizing of participants.
@@ -30759,9 +32632,9 @@
 	};
 
 	/**
-	 * @typedef {import('../../model/Types').Shape} Shape
+	 * @typedef {import('../../model/Types.js').Shape} Shape
 	 *
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 */
 
 	/**
@@ -30782,7 +32655,7 @@
 
 	AutoResizeProvider.$inject = [ 'eventBus' ];
 
-	e$2(AutoResizeProvider, RuleProvider);
+	e$3(AutoResizeProvider, RuleProvider);
 
 	/**
 	 * Needs to be implemented by sub classes to allow actual auto resize
@@ -30815,7 +32688,7 @@
 	  this._modeling = modeling;
 	}
 
-	e$2(BpmnAutoResizeProvider, AutoResizeProvider);
+	e$3(BpmnAutoResizeProvider, AutoResizeProvider);
 
 	BpmnAutoResizeProvider.$inject = [
 	  'eventBus',
@@ -30868,11 +32741,11 @@
 	/**
 	 * @typedef {import('didi').Injector} Injector
 	 *
-	 * @typedef {import('../../core/ElementRegistry').default} ElementRegistry
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 */
 
-	var HIGH_PRIORITY$l = 1500;
+	var HIGH_PRIORITY$m = 1500;
 
 
 	/**
@@ -30940,7 +32813,7 @@
 	     */
 	    eventBus.on('drag.start', function(event) {
 
-	      eventBus.once('drag.move', HIGH_PRIORITY$l, function(event) {
+	      eventBus.once('drag.move', HIGH_PRIORITY$m, function(event) {
 
 	        ensureHover(event);
 
@@ -30971,7 +32844,7 @@
 	      hover = event.element;
 	    });
 
-	    eventBus.on('element.hover', HIGH_PRIORITY$l, function(event) {
+	    eventBus.on('element.hover', HIGH_PRIORITY$m, function(event) {
 
 	      // (3) am I on an element still?
 	      if (hover) {
@@ -31038,12 +32911,12 @@
 	var round$b = Math.round;
 
 	/**
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/ElementRegistry').default} ElementRegistry
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../selection/Selection').default} Selection
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../selection/Selection.js').default} Selection
 	 */
 
 	var DRAG_ACTIVE_CLS = 'djs-drag-active';
@@ -31576,7 +33449,10 @@
 	      eventBus.on('element.out', out);
 	    }
 
-	    fire('init');
+	    if (fire('init') === false) {
+	      cancel();
+	      return false;
+	    }
 
 	    if (options.autoActivate) {
 	      move(event$1, true);
@@ -31627,10 +33503,10 @@
 	};
 
 	/**
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 *
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../../core/Canvas').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
 	 */
 
 	/**
@@ -31797,7 +33673,7 @@
 	 * to perform the actual rule evaluation. Make sure to provide the
 	 * `commandStack` service with this module if you plan to use it.
 	 *
-	 * Together with this implementation you may use the {@link import('./RuleProvider').default}
+	 * Together with this implementation you may use the {@link import('./RuleProvider.js').default}
 	 * to implement your own rule checkers.
 	 *
 	 * This module is ment to be easily replaced, thus the tiny foot print.
@@ -31846,7 +33722,7 @@
 	};
 
 	/**
-	 * @typedef {import('../util/Types').Point} Point
+	 * @typedef {import('./Types.js').Point} Point
 	 *
 	 * @typedef { {
 	 *   bendpoint?: boolean;
@@ -31976,8 +33852,8 @@
 	}
 
 	/**
-	 * @typedef {import('../../util/Types').Point} Point
-	 * @typedef {import('../../util/Types').Vector} Vector
+	 * @typedef {import('../../util/Types.js').Point} Point
+	 * @typedef {import('../../util/Types.js').Vector} Vector
 	 */
 
 	/**
@@ -32110,9 +33986,9 @@
 	}
 
 	/**
-	 * @typedef {import('../../core/Types').ConnectionLike} Connection
+	 * @typedef {import('../../core/Types.js').ConnectionLike} Connection
 	 *
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 */
 
 	var BENDPOINT_CLS = 'djs-bendpoint';
@@ -32196,6 +34072,7 @@
 	  attr(visual, {
 	    x: -width / 2,
 	    y: -height / 2,
+	    rx: 3,
 	    width: width,
 	    height: height
 	  });
@@ -32294,11 +34171,11 @@
 	}
 
 	/**
-	 * @typedef {import('../bendpoints/BendpointMove').default} BendpointMove
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../bendpoints/ConnectionSegmentMove').default} ConnectionSegmentMove
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../interaction-events/InteractionEvents').default} InteractionEvents
+	 * @typedef {import('./BendpointMove.js').default} BendpointMove
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('./ConnectionSegmentMove.js').default} ConnectionSegmentMove
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../interaction-events/InteractionEvents.js').default} InteractionEvents
 	 */
 
 	/**
@@ -32383,14 +34260,19 @@
 
 	    threshold = calculateIntersectionThreshold(connection, intersection);
 
+	    var result;
+
 	    if (isIntersectionMiddle(intersection, waypoints, threshold)) {
-	      connectionSegmentMove.start(event, connection, intersection.index);
+	      result = connectionSegmentMove.start(event, connection, intersection.index);
 	    } else {
-	      bendpointMove.start(event, connection, intersection.index, !intersection.bendpoint);
+	      result = bendpointMove.start(event, connection, intersection.index, !intersection.bendpoint);
 	    }
 
-	    // we've handled the event
-	    return true;
+	    // stop event propagation to avoid dragging from being handled by other
+	    // features
+	    if (result !== false) {
+	      return true;
+	    }
 	  }
 
 	  function bindInteractionEvents(node, eventName, element) {
@@ -32512,6 +34394,9 @@
 
 	    translate$1(floating, point.x, point.y);
 
+	    // mark as positioned so it may be shown; keeping it hidden until then
+	    // avoids a ghost bendpoint appearing at (0, 0)
+	    classes(floating).add('positioned');
 	  }
 
 	  function updateSegmentDraggerPosition(parentGfx, intersection, waypoints) {
@@ -32632,12 +34517,29 @@
 
 	    if (element.waypoints) {
 	      addHandles(element);
-	      interactionEvents.registerEvent(event.gfx, 'mousemove', 'element.mousemove');
 	    }
 	  });
 
 	  eventBus.on('element.out', function(event) {
-	    interactionEvents.unregisterEvent(event.gfx, 'mousemove', 'element.mousemove');
+	    var element = event.element;
+
+	    if (!element.waypoints) {
+	      return;
+	    }
+
+	    var bendpointsGfx = getBendpointsContainer(element);
+
+	    if (!bendpointsGfx) {
+	      return;
+	    }
+
+	    // reset floating bendpoint so it does not re-appear at a stale position
+	    // before being re-positioned on the next element.mousemove
+	    var floating = query('.floating', bendpointsGfx);
+
+	    if (floating) {
+	      classes(floating).remove('positioned');
+	    }
 	  });
 
 	  // update bendpoint container data attribute on element ID change
@@ -32681,11 +34583,11 @@
 	/**
 	 * @typedef {import('didi').Injector} Injector
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../dragging/Dragging').default} Dragging
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../modeling/Modeling').default} Modeling
-	 * @typedef {import('../rules/Rules').default} Rules
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../dragging/Dragging.js').default} Dragging
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
+	 * @typedef {import('../rules/Rules.js').default} Rules
 	 */
 
 	var round$9 = Math.round;
@@ -32743,7 +34645,7 @@
 	      return;
 	    }
 
-	    dragging.init(event, 'bendpoint.move', {
+	    return dragging.init(event, 'bendpoint.move', {
 	      data: {
 	        connection: connection,
 	        connectionGfx: gfx,
@@ -32936,9 +34838,9 @@
 	/**
 	 * @typedef {import('didi').Injector} Injector
 	 *
-	 * @typedef {import('../bendpoints/BendpointMove').default} BendpointMove
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('./BendpointMove.js').default} BendpointMove
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 */
 
 	var RECONNECT_START = 'reconnectStart',
@@ -32951,7 +34853,7 @@
 	    MARKER_CONNECT_UPDATING$1 = 'djs-updating',
 	    MARKER_DRAGGER = 'djs-dragging';
 
-	var HIGH_PRIORITY$k = 1100;
+	var HIGH_PRIORITY$l = 1100;
 
 	/**
 	 * Preview connection while moving bendpoints.
@@ -33019,7 +34921,7 @@
 	  eventBus.on([
 	    'bendpoint.move.out',
 	    'bendpoint.move.cleanup'
-	  ], HIGH_PRIORITY$k, function(event) {
+	  ], HIGH_PRIORITY$l, function(event) {
 	    var context = event.context,
 	        hover = context.hover,
 	        target = context.target;
@@ -33105,7 +35007,7 @@
 	  eventBus.on([
 	    'bendpoint.move.end',
 	    'bendpoint.move.cancel'
-	  ], HIGH_PRIORITY$k, function(event) {
+	  ], HIGH_PRIORITY$l, function(event) {
 	    var context = event.context,
 	        connection = context.connection,
 	        draggerGfx = context.draggerGfx,
@@ -33143,18 +35045,18 @@
 	    MARKER_CONNECT_UPDATING = 'djs-updating';
 
 	/**
-	 * @typedef {import('../../model/Types').Shape} Shape
+	 * @typedef {import('../../model/Types.js').Shape} Shape
 	 *
-	 * @typedef {import('../../util/Types').Axis} Axis
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../util/Types.js').Axis} Axis
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 *
 	 * @typedef {import('didi').Injector} Injector
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../dragging/Dragging').default} Dragging
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../../core/GraphicsFactory').default} GraphicsFactory
-	 * @typedef {import('../modeling/Modeling').default} Modeling
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../dragging/Dragging.js').default} Dragging
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../../core/GraphicsFactory.js').default} GraphicsFactory
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
 	 */
 
 	function axisAdd(point, axis, delta) {
@@ -33281,7 +35183,7 @@
 	      dragPosition: dragPosition
 	    };
 
-	    dragging.init(event, dragPosition, 'connectionSegment.move', {
+	    return dragging.init(event, dragPosition, 'connectionSegment.move', {
 	      cursor: axis === 'x' ? 'resize-ew' : 'resize-ns',
 	      data: {
 	        connection: connection,
@@ -33564,12 +35466,12 @@
 	];
 
 	/**
-	 * @typedef {import('../../core/Types').ConnectionLike} Connection
-	 * @typedef {import('../../core/Types').ShapeLike} Shape
+	 * @typedef {import('../../core/Types.js').ConnectionLike} Connection
+	 * @typedef {import('../../core/Types.js').ShapeLike} Shape
 	 *
-	 * @typedef {import('../../core/EventBus').Event} Event
+	 * @typedef {import('../../core/EventBus.js').Event} Event
 	 *
-	 * @typedef {import('../../util/Types').Axis} Axis
+	 * @typedef {import('../../util/Types.js').Axis} Axis
 	 */
 
 	var abs$6 = Math.abs,
@@ -33704,7 +35606,7 @@
 	}
 
 	/**
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 */
 	var abs$5 = Math.abs,
 	    round$7 = Math.round;
@@ -33958,14 +35860,14 @@
 	};
 
 	/**
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../model/Types.js').Element} Element
 	 *
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 *
-	 * @typedef {import('../dragging/Dragging').default} Dragging
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../modeling/Modeling').default} Modeling
-	 * @typedef {import('../rules/Rules').default} Rules
+	 * @typedef {import('../dragging/Dragging.js').default} Dragging
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
+	 * @typedef {import('../rules/Rules.js').default} Rules
 	 */
 
 	/**
@@ -34117,12 +36019,12 @@
 	/**
 	 * @typedef {import('didi').Injector} Injector
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 */
 
-	var HIGH_PRIORITY$j = 1100,
-	    LOW_PRIORITY$k = 900;
+	var HIGH_PRIORITY$k = 1100,
+	    LOW_PRIORITY$m = 900;
 
 	var MARKER_OK$3 = 'connect-ok',
 	    MARKER_NOT_OK$3 = 'connect-not-ok';
@@ -34166,7 +36068,7 @@
 	    });
 	  });
 
-	  eventBus.on('connect.hover', LOW_PRIORITY$k, function(event) {
+	  eventBus.on('connect.hover', LOW_PRIORITY$m, function(event) {
 	    var context = event.context,
 	        hover = event.hover,
 	        canExecute = context.canExecute;
@@ -34182,7 +36084,7 @@
 	  eventBus.on([
 	    'connect.out',
 	    'connect.cleanup'
-	  ], HIGH_PRIORITY$j, function(event) {
+	  ], HIGH_PRIORITY$k, function(event) {
 	    var hover = event.hover;
 
 	    if (hover) {
@@ -34219,17 +36121,17 @@
 	};
 
 	/**
-	 * @typedef {import('../../model/Types').Element} Element
-	 * @typedef {import('../../model/Types').Connection} Connection
-	 * @typedef {import('../../model/Types').Shape} Shape
+	 * @typedef {import('../../model/Types.js').Element} Element
+	 * @typedef {import('../../model/Types.js').Connection} Connection
+	 * @typedef {import('../../model/Types.js').Shape} Shape
 	 *
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 *
 	 * @typedef {import('didi').Injector} Injector
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/ElementFactory').default} ElementFactory
-	 * @typedef {import('../../core/GraphicsFactory').default} GraphicsFactory
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/ElementFactory.js').default} ElementFactory
+	 * @typedef {import('../../core/GraphicsFactory.js').default} GraphicsFactory
 	 */
 
 	var MARKER_CONNECTION_PREVIEW = 'djs-dragger';
@@ -34514,13 +36416,13 @@
 	};
 
 	/**
-	 * @typedef {import('../../core/Types').ElementLike} Element
-	 * @typedef {import('../../core/Types').ShapeLike} Shape
+	 * @typedef {import('../../core/Types.js').ElementLike} Element
+	 * @typedef {import('../../core/Types.js').ShapeLike} Shape
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/ElementRegistry').default} ElementRegistry
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../../draw/Styles').default} Styles
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../../draw/Styles.js').default} Styles
 	 */
 
 	const cloneIds = new IdGenerator('ps');
@@ -34595,14 +36497,10 @@
 	  gfx = gfx || this.getGfx(element);
 
 	  var dragger = clone(gfx);
-	  var bbox = gfx.getBoundingClientRect();
 
 	  this._cloneMarkers(getVisual(dragger), className);
 
-	  attr(dragger, this._styles.cls(className, [], {
-	    x: bbox.top,
-	    y: bbox.left
-	  }));
+	  attr(dragger, this._styles.cls(className, []));
 
 	  append(group, dragger);
 
@@ -34766,10 +36664,10 @@
 	};
 
 	/**
-	 * @typedef {import('../../model/Types').Element} Element
-	 * @typedef {import('../../model/Types').Shape} Shape
-	 * @typedef {import('../../util/Types').Point} Point
-	 * @typedef {import('../../util/Types').Rect} Rect
+	 * @typedef {import('../../model/Types.js').Element} Element
+	 * @typedef {import('../../model/Types.js').Shape} Shape
+	 * @typedef {import('../../util/Types.js').Point} Point
+	 * @typedef {import('../../util/Types.js').Rect} Rect
 	 *
 	 * @typedef { { element: Element, delta: Point } } MovedOption
 	 * @typedef { { shape: Shape, bounds: Rect } } ResizedOption
@@ -35003,6 +36901,11 @@
 	      return;
 	    }
 
+	    // group labels are expected to overlap their group
+	    if (is(element, 'bpmn:Group')) {
+	      return;
+	    }
+
 	    var optimalPosition = getOptimalPosition(element);
 
 	    // no optimal position found
@@ -35072,7 +36975,7 @@
 
 	}
 
-	e$2(AdaptiveLabelPositioningBehavior, CommandInterceptor);
+	e$3(AdaptiveLabelPositioningBehavior, CommandInterceptor);
 
 	AdaptiveLabelPositioningBehavior.$inject = [
 	  'eventBus',
@@ -35224,7 +37127,7 @@
 	  }, true);
 	}
 
-	e$2(AppendBehavior, CommandInterceptor);
+	e$3(AppendBehavior, CommandInterceptor);
 
 	AppendBehavior.$inject = [
 	  'eventBus'
@@ -35238,7 +37141,7 @@
 	 * @typedef {import('../../../model/Types').Element} Element
 	 */
 
-	var HIGH_PRIORITY$i = 1500;
+	var HIGH_PRIORITY$j = 1500;
 
 	/**
 	 * A behavior that ensures that visually enclosed artifacts are affected
@@ -35259,7 +37162,7 @@
 	  injector.invoke(CommandInterceptor, this);
 
 	  // enclosed artifacts are deleted with a container element
-	  this.preExecute('elements.delete', HIGH_PRIORITY$i, function(event) {
+	  this.preExecute('elements.delete', HIGH_PRIORITY$j, function(event) {
 	    var context = event.context,
 	        elements = context.elements;
 
@@ -35326,7 +37229,7 @@
 
 	}
 
-	e$2(ArtifactBehavior, CommandInterceptor);
+	e$3(ArtifactBehavior, CommandInterceptor);
 
 	ArtifactBehavior.$inject = [
 	  'injector',
@@ -35360,7 +37263,7 @@
 	  }, true);
 	}
 
-	e$2(AssociationBehavior, CommandInterceptor);
+	e$3(AssociationBehavior, CommandInterceptor);
 
 	AssociationBehavior.$inject = [
 	  'injector',
@@ -35372,7 +37275,7 @@
 	 * @typedef {import('didi').Injector} Injector
 	 */
 
-	var LOW_PRIORITY$j = 500;
+	var LOW_PRIORITY$l = 500;
 
 
 	/**
@@ -35388,7 +37291,7 @@
 
 	  var self = this;
 
-	  this.postExecuted('elements.create', LOW_PRIORITY$j, function(context) {
+	  this.postExecuted('elements.create', LOW_PRIORITY$l, function(context) {
 	    var elements = context.elements;
 
 	    elements = elements.filter(function(shape) {
@@ -35411,7 +37314,7 @@
 	  }, true);
 
 
-	  this.preExecute('elements.move', LOW_PRIORITY$j, function(context) {
+	  this.preExecute('elements.move', LOW_PRIORITY$l, function(context) {
 	    var shapes = context.shapes,
 	        host = context.newHost;
 
@@ -35432,7 +37335,7 @@
 	  'injector'
 	];
 
-	e$2(AttachEventBehavior, CommandInterceptor);
+	e$3(AttachEventBehavior, CommandInterceptor);
 
 	AttachEventBehavior.prototype._replaceShape = function(shape, host) {
 	  var eventDefinition = getEventDefinition$1(shape);
@@ -35527,7 +37430,256 @@
 	  'modeling'
 	];
 
-	e$2(BoundaryEventBehavior, CommandInterceptor);
+	e$3(BoundaryEventBehavior, CommandInterceptor);
+
+	/**
+	 * @typedef {import('../../BpmnFactory').default} BpmnFactory
+	 *
+	 * @typedef {import('../../../../model/Types').ModdleElement} ModdleElement
+	 */
+
+	/**
+	 * Creates a new bpmn:CategoryValue inside a new bpmn:Category
+	 *
+	 * @param {BpmnFactory} bpmnFactory
+	 *
+	 * @return {ModdleElement}
+	 */
+	function createCategory(bpmnFactory) {
+	  return bpmnFactory.create('bpmn:Category');
+	}
+
+	/**
+	 * Creates a new bpmn:CategoryValue inside a new bpmn:Category
+	 *
+	 * @param {BpmnFactory} bpmnFactory
+	 *
+	 * @return {ModdleElement}
+	 */
+	function createCategoryValue(bpmnFactory) {
+	  return bpmnFactory.create('bpmn:CategoryValue');
+	}
+
+	/**
+	 * Returns a group's category value, creating one (including a
+	 * category) if needed.
+	 *
+	 * @param {BpmnFactory} bpmnFactory
+	 * @param {ModdleElement} groupBo
+	 *
+	 * @return {ModdleElement}
+	 */
+	function getOrCreateCategoryValueForGroup(bpmnFactory, groupBo) {
+	  var categoryValue = groupBo.get('categoryValueRef');
+
+	  if (!categoryValue) {
+	    categoryValue = groupBo.categoryValueRef = createCategoryValue(bpmnFactory);
+	  }
+
+	  if (!categoryValue.$parent) {
+	    categoryValue.$parent = createCategory(bpmnFactory);
+	  }
+
+	  return categoryValue;
+	}
+
+	/**
+	 * Adds category value to definitions
+	 *
+	 * @param {ModdleElement} categoryValue
+	 * @param {ModdleElement} category
+	 * @param {ModdleElement} definitions
+	 *
+	 * @return {ModdleElement}
+	 */
+	function linkCategoryValue(categoryValue, category, definitions) {
+	  add(category.get('categoryValue'), categoryValue);
+	  categoryValue.$parent = category;
+
+	  add(definitions.get('rootElements'), category);
+	  category.$parent = definitions;
+
+	  return categoryValue;
+	}
+
+	/**
+	 * Unlink category value from parent
+	 *
+	 * @param {ModdleElement} categoryValue
+	 *
+	 * @return {ModdleElement}
+	 */
+	function unlinkCategoryValue(categoryValue) {
+	  var category = categoryValue.$parent;
+
+	  if (category) {
+	    remove(category.get('categoryValue'), categoryValue);
+	    categoryValue.$parent = null;
+	  }
+
+	  return categoryValue;
+	}
+
+	/**
+	 * Unlink category from parent
+	 *
+	 * @param {ModdleElement} category
+	 *
+	 * @return {ModdleElement}
+	 */
+	function unlinkCategory(category) {
+	  var definitions = category.$parent;
+
+	  if (definitions) {
+	    remove(definitions.get('rootElements'), category);
+	    category.$parent = null;
+	  }
+
+	  return category;
+	}
+
+	var LOW_PRIORITY$k = 500;
+
+	/**
+	 * @typedef {import('../../../Modeler').default} Modeler
+	 * @typedef {import('diagram-js/lib/core/ElementRegistry').default} ElementRegistry
+	 * @typedef {import('didi').Injector} Injector
+	 */
+
+	/**
+	 * Maintains a group's category (value) inside definitions#rootElements.
+	 *
+	 * @param {Modeler} bpmnjs
+	 * @param {ElementRegistry} elementRegistry
+	 * @param {Injector} injector
+	 */
+	function CategoryRootElementReferenceBehavior(
+	    bpmnjs, elementRegistry, injector
+	) {
+	  injector.invoke(CommandInterceptor, this);
+
+	  function getGroupBusinessObjects(ignoredBusinessObject) {
+	    return elementRegistry.filter(function(element) {
+	      return is(element, 'bpmn:Group') && !element.labelTarget;
+	    }).map(getBusinessObject).filter(function(businessObject) {
+	      return businessObject !== ignoredBusinessObject;
+	    });
+	  }
+
+	  function isCategoryValueReferenced(categoryValue, ignoredBusinessObject) {
+	    return getGroupBusinessObjects(ignoredBusinessObject).some(function(businessObject) {
+	      return businessObject.get('categoryValueRef') === categoryValue;
+	    });
+	  }
+
+	  function isCategoryReferenced(category, ignoredBusinessObject) {
+	    return getGroupBusinessObjects(ignoredBusinessObject).some(function(businessObject) {
+	      var categoryValue = businessObject.get('categoryValueRef');
+
+	      return categoryValue && categoryValue.$parent === category;
+	    });
+	  }
+
+	  function link(categoryValue, category) {
+	    if (categoryValue && category) {
+	      linkCategoryValue(categoryValue, category, bpmnjs.getDefinitions());
+	    }
+	  }
+
+	  function unlink(categoryValue, category, ignoredBusinessObject) {
+	    if (category && !isCategoryReferenced(category, ignoredBusinessObject)) {
+	      unlinkCategory(category);
+	    }
+
+	    if (categoryValue && !isCategoryValueReferenced(categoryValue, ignoredBusinessObject)) {
+	      unlinkCategoryValue(categoryValue);
+	    }
+	  }
+
+
+	  this.executed([ 'shape.create', 'label.create' ], function(context) {
+	    var shape = context.labelTarget || context.shape;
+
+	    if (!is(shape, 'bpmn:Group') || shape.labelTarget) {
+	      return;
+	    }
+
+	    link(context.categoryValue, context.category);
+	  }, true);
+
+	  this.reverted([ 'shape.create', 'label.create' ], function(context) {
+	    var shape = context.labelTarget || context.shape;
+
+	    if (!is(shape, 'bpmn:Group') || shape.labelTarget) {
+	      return;
+	    }
+
+	    unlink(context.categoryValue, context.category, getBusinessObject(shape));
+	  }, true);
+
+	  this.executed([ 'shape.move', 'shape.resize' ], LOW_PRIORITY$k, function(context) {
+	    link(context.categoryValue, context.category);
+	  }, true);
+
+	  this.reverted([ 'shape.move', 'shape.resize' ], function(context) {
+	    var shape = context.shape;
+
+	    if (context.categoryValue) {
+	      unlink(context.categoryValue, context.category, getBusinessObject(shape));
+	    }
+	  }, true);
+
+	  this.executed('group.updateRefs', function(context) {
+	    getGroupUpdates(context).forEach(function(update) {
+	      link(update.categoryValue, update.category);
+	    });
+	  }, true);
+
+	  this.reverted('group.updateRefs', function(context) {
+	    getGroupUpdates(context).forEach(function(update) {
+	      unlink(
+	        update.categoryValue,
+	        update.category,
+	        getBusinessObject(update.groupShape)
+	      );
+	    });
+	  }, true);
+
+	  this.executed('shape.delete', function(context) {
+	    var shape = context.shape;
+
+	    if (!is(shape, 'bpmn:Group') || shape.labelTarget) {
+	      return;
+	    }
+
+	    unlink(context.categoryValue, context.category, getBusinessObject(shape));
+	  }, true);
+
+	  this.reverted('shape.delete', function(context) {
+	    var shape = context.shape;
+
+	    if (!is(shape, 'bpmn:Group') || shape.labelTarget) {
+	      return;
+	    }
+
+	    link(context.categoryValue, context.category);
+	  }, true);
+	}
+
+	CategoryRootElementReferenceBehavior.$inject = [
+	  'bpmnjs',
+	  'elementRegistry',
+	  'injector'
+	];
+
+	e$3(CategoryRootElementReferenceBehavior, CommandInterceptor);
+
+
+	// helpers //////////
+
+	function getGroupUpdates(context) {
+	  return context.updates?.groups || [];
+	}
 
 	/**
 	 * @typedef {import('diagram-js/lib/core/EventBus').default} EventBus
@@ -35721,7 +37873,7 @@
 	  }
 	}
 
-	e$2(CompensateBoundaryEventBehavior, CommandInterceptor);
+	e$3(CompensateBoundaryEventBehavior, CommandInterceptor);
 
 	CompensateBoundaryEventBehavior.$inject = [
 	  'eventBus',
@@ -35770,7 +37922,7 @@
 
 	CreateBehavior.$inject = [ 'injector' ];
 
-	e$2(CreateBehavior, CommandInterceptor);
+	e$3(CreateBehavior, CommandInterceptor);
 
 	/**
 	 * @typedef {import('diagram-js/lib/core/EventBus').default} EventBus
@@ -35812,7 +37964,7 @@
 	  'bpmnFactory'
 	];
 
-	e$2(CreateDataObjectBehavior, CommandInterceptor);
+	e$3(CreateDataObjectBehavior, CommandInterceptor);
 
 	/**
 	 * @typedef {import('diagram-js/lib/core/Canvas').default} Canvas
@@ -35825,7 +37977,7 @@
 
 	var PARTICIPANT_BORDER_WIDTH = 30;
 
-	var HIGH_PRIORITY$h = 2000;
+	var HIGH_PRIORITY$i = 2000;
 
 
 	/**
@@ -35842,7 +37994,7 @@
 	  eventBus.on([
 	    'create.start',
 	    'shape.move.start'
-	  ], HIGH_PRIORITY$h, function(event) {
+	  ], HIGH_PRIORITY$i, function(event) {
 	    var context = event.context,
 	        shape = context.shape,
 	        rootElement = canvas.getRootElement();
@@ -35877,7 +38029,7 @@
 	  });
 
 	  // force hovering process when creating first participant
-	  eventBus.on('create.start', HIGH_PRIORITY$h, function(event) {
+	  eventBus.on('create.start', HIGH_PRIORITY$i, function(event) {
 	    var context = event.context,
 	        shape = context.shape,
 	        rootElement = canvas.getRootElement(),
@@ -35889,7 +38041,7 @@
 	    }
 
 	    if (is(shape, 'bpmn:Participant') && is(rootElement, 'bpmn:Process')) {
-	      eventBus.on('element.hover', HIGH_PRIORITY$h, ensureHoveringProcess);
+	      eventBus.on('element.hover', HIGH_PRIORITY$i, ensureHoveringProcess);
 
 	      eventBus.once('create.cleanup', function() {
 	        eventBus.off('element.hover', ensureHoveringProcess);
@@ -35910,7 +38062,7 @@
 
 	  // when creating mutliple elements through `elements.create` parent must be set to collaboration
 	  // and passed to `shape.create` as hint
-	  this.preExecute('elements.create', HIGH_PRIORITY$h, function(context) {
+	  this.preExecute('elements.create', HIGH_PRIORITY$i, function(context) {
 	    var elements = context.elements,
 	        parent = context.parent,
 	        participant = findParticipant(elements),
@@ -35996,7 +38148,7 @@
 	  'modeling'
 	];
 
-	e$2(CreateParticipantBehavior, CommandInterceptor);
+	e$3(CreateParticipantBehavior, CommandInterceptor);
 
 	// helpers //////////
 
@@ -36159,7 +38311,7 @@
 	  'bpmnFactory'
 	];
 
-	e$2(DataInputAssociationBehavior, CommandInterceptor);
+	e$3(DataInputAssociationBehavior, CommandInterceptor);
 
 
 	/**
@@ -36411,7 +38563,7 @@
 	  'eventBus',
 	];
 
-	e$2(DataStoreBehavior, CommandInterceptor);
+	e$3(DataStoreBehavior, CommandInterceptor);
 
 
 	// helpers //////////
@@ -36448,13 +38600,13 @@
 	var DEFAULT_CHILD_BOX_PADDING = 20;
 
 	/**
-	 * @typedef {import('../../core/Types').ElementLike} Element
-	 * @typedef {import('../../core/Types').ShapeLike} Shape
+	 * @typedef {import('../../core/Types.js').ElementLike} Element
+	 * @typedef {import('../../core/Types.js').ShapeLike} Shape
 	 *
-	 * @typedef {import('../../util/Types').Direction} Direction
-	 * @typedef {import('../../util/Types').Point} Point
-	 * @typedef {import('../../util/Types').Rect} Rect
-	 * @typedef {import('../../util/Types').RectTRBL} RectTRBL
+	 * @typedef {import('../../util/Types.js').Direction} Direction
+	 * @typedef {import('../../util/Types.js').Point} Point
+	 * @typedef {import('../../util/Types.js').Rect} Rect
+	 * @typedef {import('../../util/Types.js').RectTRBL} RectTRBL
 	 */
 
 	/**
@@ -36846,7 +38998,7 @@
 	 * @typedef {import('../../space-tool/BpmnSpaceTool').default} SpaceTool
 	 */
 
-	var LOW_PRIORITY$i = 500;
+	var LOW_PRIORITY$j = 500;
 
 
 	/**
@@ -36959,7 +39111,7 @@
 	  /**
 	   * Adjust sizes of other lanes after lane deletion
 	   */
-	  this.postExecuted('shape.delete', LOW_PRIORITY$i, function(event) {
+	  this.postExecuted('shape.delete', LOW_PRIORITY$j, function(event) {
 
 	    var context = event.context,
 	        hints = context.hints,
@@ -36985,14 +39137,14 @@
 	  'spaceTool'
 	];
 
-	e$2(DeleteLaneBehavior, CommandInterceptor);
+	e$3(DeleteLaneBehavior, CommandInterceptor);
 
 	/**
 	 * @typedef {import('../../replace/BpmnReplace').default} BpmnReplace
 	 * @typedef {import('didi').Injector} Injector
 	 */
 
-	var LOW_PRIORITY$h = 500;
+	var LOW_PRIORITY$i = 500;
 
 
 	/**
@@ -37008,7 +39160,7 @@
 
 	  var self = this;
 
-	  this.postExecuted('elements.create', LOW_PRIORITY$h, function(context) {
+	  this.postExecuted('elements.create', LOW_PRIORITY$i, function(context) {
 	    var elements = context.elements;
 
 	    elements.filter(function(shape) {
@@ -37022,14 +39174,14 @@
 	    });
 	  }, true);
 
-	  this.preExecute('elements.move', LOW_PRIORITY$h, function(context) {
+	  this.preExecute('elements.move', LOW_PRIORITY$i, function(context) {
 	    var shapes = context.shapes,
 	        newHost = context.newHost;
 
 	    shapes.forEach(function(shape, index) {
 	      var host = shape.host;
 
-	      if (shouldReplace(shape, includes$6(shapes, host) ? host : newHost)) {
+	      if (shouldReplace(shape, includes$3(shapes, host) ? host : newHost)) {
 	        shapes[ index ] = self._replaceShape(shape);
 	      }
 	    });
@@ -37041,7 +39193,7 @@
 	  'injector'
 	];
 
-	e$2(DetachEventBehavior, CommandInterceptor);
+	e$3(DetachEventBehavior, CommandInterceptor);
 
 	DetachEventBehavior.prototype._replaceShape = function(shape) {
 	  var eventDefinition = getEventDefinition(shape),
@@ -37075,7 +39227,7 @@
 	  return !isLabel(shape) && is(shape, 'bpmn:BoundaryEvent') && !host;
 	}
 
-	function includes$6(array, item) {
+	function includes$3(array, item) {
 	  return array.indexOf(item) !== -1;
 	}
 
@@ -37258,7 +39410,7 @@
 	  }, true);
 	}
 
-	e$2(DropOnFlowBehavior, CommandInterceptor);
+	e$3(DropOnFlowBehavior, CommandInterceptor);
 
 	DropOnFlowBehavior.$inject = [
 	  'eventBus',
@@ -37381,7 +39533,7 @@
 	  'modeling'
 	];
 
-	e$2(EventBasedGatewayBehavior, CommandInterceptor);
+	e$3(EventBasedGatewayBehavior, CommandInterceptor);
 
 	// helpers //////////
 
@@ -37395,7 +39547,7 @@
 	 * @typedef {import('diagram-js/lib/core/Canvas').default} Canvas
 	 */
 
-	var HIGH_PRIORITY$g = 1500;
+	var HIGH_PRIORITY$h = 1500;
 	var HIGHEST_PRIORITY = 2000;
 
 
@@ -37417,7 +39569,7 @@
 	    'shape.move.move',
 	    'shape.move.out',
 	    'shape.move.end'
-	  ], HIGH_PRIORITY$g, function(event) {
+	  ], HIGH_PRIORITY$h, function(event) {
 	    var context = event.context,
 	        shape = context.shape || event.shape,
 	        hover = event.hover;
@@ -37432,8 +39584,9 @@
 	    var rootElement = canvas.getRootElement();
 
 	    // ensure bpmn:Group and label elements are dropped
-	    // always onto the root
-	    if (hover !== rootElement && (shape.labelTarget || isAny(shape, [ 'bpmn:Group', 'bpmn:TextAnnotation' ]))) {
+	    // always onto the root; keep a missing hover (e.g. dropped outside
+	    // the canvas) untouched so it can be rejected by the rules
+	    if (hover && hover !== rootElement && (shape.labelTarget || isAny(shape, [ 'bpmn:Group', 'bpmn:TextAnnotation' ]))) {
 	      event.hover = rootElement;
 	      event.hoverGfx = elementRegistry.getGraphics(event.hover);
 	    }
@@ -37448,7 +39601,7 @@
 	    'global-connect.out',
 	    'global-connect.end',
 	    'global-connect.cleanup'
-	  ], HIGH_PRIORITY$g, function(event) {
+	  ], HIGH_PRIORITY$h, function(event) {
 	    var hover = event.hover;
 
 	    // ensure connections start/end on bpmn:Participant,
@@ -37462,7 +39615,7 @@
 
 	  eventBus.on([
 	    'bendpoint.move.hover'
-	  ], HIGH_PRIORITY$g, function(event) {
+	  ], HIGH_PRIORITY$h, function(event) {
 	    var context = event.context,
 	        hover = event.hover,
 	        type = context.type;
@@ -37478,7 +39631,7 @@
 
 	  eventBus.on([
 	    'connect.start'
-	  ], HIGH_PRIORITY$g, function(event) {
+	  ], HIGH_PRIORITY$h, function(event) {
 	    var context = event.context,
 	        start = context.start;
 
@@ -37518,100 +39671,11 @@
 	];
 
 	/**
-	 * @typedef {import('../../BpmnFactory').default} BpmnFactory
-	 *
-	 * @typedef {import('../../../model/Types').ModdleElement} ModdleElement
-	 */
-
-	/**
-	 * Creates a new bpmn:CategoryValue inside a new bpmn:Category
-	 *
-	 * @param {BpmnFactory} bpmnFactory
-	 *
-	 * @return {ModdleElement}
-	 */
-	function createCategory(bpmnFactory) {
-	  return bpmnFactory.create('bpmn:Category');
-	}
-
-	/**
-	 * Creates a new bpmn:CategoryValue inside a new bpmn:Category
-	 *
-	 * @param {BpmnFactory} bpmnFactory
-	 *
-	 * @return {ModdleElement}
-	 */
-	function createCategoryValue(bpmnFactory) {
-	  return bpmnFactory.create('bpmn:CategoryValue');
-	}
-
-	/**
-	 * Adds category value to definitions
-	 *
-	 * @param {ModdleElement} categoryValue
-	 * @param {ModdleElement} category
-	 * @param {ModdleElement} definitions
-	 *
-	 * @return {ModdleElement}
-	 */
-	function linkCategoryValue(categoryValue, category, definitions) {
-	  add(category.get('categoryValue'), categoryValue);
-	  categoryValue.$parent = category;
-
-	  add(definitions.get('rootElements'), category);
-	  category.$parent = definitions;
-
-	  return categoryValue;
-	}
-
-	/**
-	 * Unlink category value from parent
-	 *
-	 * @param {ModdleElement} categoryValue
-	 *
-	 * @return {ModdleElement}
-	 */
-	function unlinkCategoryValue(categoryValue) {
-	  var category = categoryValue.$parent;
-
-	  if (category) {
-	    remove(category.get('categoryValue'), categoryValue);
-	    categoryValue.$parent = null;
-	  }
-
-	  return categoryValue;
-	}
-
-	/**
-	 * Unlink category from parent
-	 *
-	 * @param {ModdleElement} category
-	 *
-	 * @return {ModdleElement}
-	 */
-	function unlinkCategory(category) {
-	  var definitions = category.$parent;
-
-	  if (definitions) {
-	    remove(definitions.get('rootElements'), category);
-	    category.$parent = null;
-	  }
-
-	  return category;
-	}
-
-	/**
 	 * @typedef {import('../BpmnFactory').default} BpmnFactory
-	 * @typedef {import('../../../Modeler').default} Modeler
-	 * @typedef {import('diagram-js/lib/core/ElementRegistry').default} ElementRegistry
 	 * @typedef {import('diagram-js/lib/core/EventBus').default} EventBus
+	 * @typedef {import('diagram-js/lib/core/ElementRegistry').default} ElementRegistry
 	 * @typedef {import('didi').Injector} Injector
 	 * @typedef {import('../../copy-paste/ModdleCopy').default} ModdleCopy
-	 *
-	 * @typedef {import('../../../model/Types').Element} Element
-	 * @typedef {import('../../../model/Types').Shape} Shape
-	 *
-	 * @typedef {import('diagram-js/lib/util/Types').DirectionTRBL} DirectionTRBL
 	 */
 
 	var LOWER_PRIORITY$1 = 770;
@@ -37621,137 +39685,45 @@
 	 * BPMN specific group behavior.
 	 *
 	 * @param {BpmnFactory} bpmnFactory
-	 * @param {Modeler} bpmnjs
-	 * @param {ElementRegistry} elementRegistry
 	 * @param {EventBus} eventBus
 	 * @param {Injector} injector
 	 * @param {ModdleCopy} moddleCopy
 	 */
 	function GroupBehavior(
 	    bpmnFactory,
-	    bpmnjs,
-	    elementRegistry,
 	    eventBus,
 	    injector,
 	    moddleCopy
 	) {
 	  injector.invoke(CommandInterceptor, this);
 
-	  /**
-	   * Returns all group element in the current registry.
-	   *
-	   * @return {Shape[]}
-	   */
-	  function getGroupElements() {
-	    return elementRegistry.filter(function(e) {
-	      return is(e, 'bpmn:Group');
-	    });
-	  }
-
-	  /**
-	   * Returns true if given category is referenced in one of the given elements.
-	   *
-	   * @param {Element[]} elements
-	   * @param {ModdleElement} category
-	   *
-	   * @return {boolean}
-	   */
-	  function isReferencedCategory(elements, category) {
-	    return elements.some(function(element) {
-	      var businessObject = getBusinessObject(element);
-
-	      var _category = businessObject.categoryValueRef && businessObject.categoryValueRef.$parent;
-
-	      return _category === category;
-	    });
-	  }
-
-	  /**
-	   * Returns true if given categoryValue is referenced in one of the given elements.
-	   *
-	   * @param {Element[]} elements
-	   * @param {ModdleElement} categoryValue
-	   *
-	   * @return {boolean}
-	   */
-	  function isReferencedCategoryValue(elements, categoryValue) {
-	    return elements.some(function(element) {
-	      var businessObject = getBusinessObject(element);
-
-	      return businessObject.categoryValueRef === categoryValue;
-	    });
-	  }
-
-	  /**
-	   * Remove category value unless it is still referenced.
-	   *
-	   * @param {ModdleElement} categoryValue
-	   * @param {ModdleElement} category
-	   * @param {ModdleElement} businessObject
-	   */
-	  function removeCategoryValue(categoryValue, category, businessObject) {
-
-	    var groups = getGroupElements().filter(function(element) {
-	      return element.businessObject !== businessObject;
-	    });
-
-	    if (category && !isReferencedCategory(groups, category)) {
-	      unlinkCategory(category);
-	    }
-
-	    if (categoryValue && !isReferencedCategoryValue(groups, categoryValue)) {
-	      unlinkCategoryValue(categoryValue);
-	    }
-	  }
-
-	  /**
-	   * Add category value.
-	   *
-	   * @param {ModdleElement} categoryValue
-	   * @param {ModdleElement} category
-	   *
-	   * @return {ModdleElement}
-	   */
-	  function addCategoryValue(categoryValue, category) {
-	    return linkCategoryValue(categoryValue, category, bpmnjs.getDefinitions());
-	  }
-
 	  function setCategoryValue(element, context) {
 	    var businessObject = getBusinessObject(element),
-	        categoryValue = businessObject.categoryValueRef;
+	        categoryValue = context.categoryValue || businessObject.categoryValueRef;
 
 	    if (!categoryValue) {
-	      categoryValue =
-	      businessObject.categoryValueRef =
-	      context.categoryValue = (
-	        context.categoryValue || createCategoryValue(bpmnFactory)
-	      );
+	      categoryValue = getOrCreateCategoryValueForGroup(bpmnFactory, businessObject);
 	    }
 
-	    var category = categoryValue.$parent;
+	    var category = context.category || categoryValue.$parent || createCategory(bpmnFactory);
 
-	    if (!category) {
-	      category =
-	      categoryValue.$parent =
-	      context.category = (
-	        context.category || createCategory(bpmnFactory)
-	      );
-	    }
+	    businessObject.categoryValueRef = categoryValue;
+	    categoryValue.$parent = category;
 
-	    addCategoryValue(categoryValue, category, bpmnjs.getDefinitions());
+	    context.categoryValue = categoryValue;
+	    context.category = category;
 	  }
 
 	  function unsetCategoryValue(element, context) {
-	    var category = context.category,
-	        categoryValue = context.categoryValue,
-	        businessObject = getBusinessObject(element);
+	    var businessObject = getBusinessObject(element),
+	        categoryValue = context.categoryValue || businessObject.categoryValueRef,
+	        category = context.category || (categoryValue && categoryValue.$parent);
 
 	    if (categoryValue) {
-	      businessObject.categoryValueRef = null;
+	      context.categoryValue = categoryValue;
+	      context.category = category;
 
-	      removeCategoryValue(categoryValue, category, businessObject);
-	    } else {
-	      removeCategoryValue(null, businessObject.categoryValueRef.$parent, businessObject);
+	      businessObject.categoryValueRef = null;
 	    }
 	  }
 
@@ -37793,14 +39765,10 @@
 	      return;
 	    }
 
-	    var categoryValue = context.categoryValue = businessObject.categoryValueRef,
-	        category;
+	    var categoryValue = context.categoryValue = businessObject.categoryValueRef;
 
 	    if (categoryValue) {
-	      category = context.category = categoryValue.$parent;
-
-	      removeCategoryValue(categoryValue, category, businessObject);
-
+	      context.category = categoryValue.$parent;
 	      businessObject.categoryValueRef = null;
 	    }
 	  });
@@ -37820,39 +39788,77 @@
 
 	    if (categoryValue) {
 	      businessObject.categoryValueRef = categoryValue;
-
-	      addCategoryValue(categoryValue, category);
+	      categoryValue.$parent = category;
 	    }
 	  });
 
 
-	  // create new category + value when group was created
+	  // create new category + value when group was created so that visually
+	  // enclosed elements can be categorized against it, even if it is unlabeled
 
 	  this.execute('shape.create', function(event) {
 	    var context = event.context,
-	        shape = context.shape;
+	        shape = context.shape,
+	        hints = context.hints || {};
 
 	    if (!is(shape, 'bpmn:Group') || shape.labelTarget) {
 	      return;
 	    }
 
-	    if (getBusinessObject(shape).categoryValueRef) {
-	      setCategoryValue(shape, context);
+	    // during paste the category value (if any) is carried over from the
+	    // source; only fabricate one for genuinely new groups
+	    if (hints.createElementsBehavior === false &&
+	        !getBusinessObject(shape).categoryValueRef &&
+	        !context.categoryValue) {
+	      return;
 	    }
+
+	    setCategoryValue(shape, context);
 	  });
 
 	  this.reverted('shape.create', function(event) {
 
 	    var context = event.context,
-	        shape = context.shape;
+	        shape = context.shape,
+	        hints = context.hints || {};
 
 	    if (!is(shape, 'bpmn:Group') || shape.labelTarget) {
 	      return;
 	    }
 
-	    if (getBusinessObject(shape).categoryValueRef) {
-	      unsetCategoryValue(shape, context);
+	    if (hints.createElementsBehavior === false &&
+	        !getBusinessObject(shape).categoryValueRef &&
+	        !context.categoryValue) {
+	      return;
 	    }
+
+	    unsetCategoryValue(shape, context);
+	  });
+
+
+	  // add category -> categoryValue for groups when they change
+
+	  this.executed([ 'shape.move', 'shape.resize' ], function(event) {
+	    var context = event.context,
+	        shape = context.shape;
+
+	    if (!is(shape, 'bpmn:Group') || shape.labelTarget ||
+	        getBusinessObject(shape).categoryValueRef) {
+	      return;
+	    }
+
+	    setCategoryValue(shape, context);
+	  });
+
+	  this.reverted([ 'shape.move', 'shape.resize' ], function(event) {
+	    var context = event.context,
+	        shape = context.shape;
+
+	    if (!is(shape, 'bpmn:Group') || shape.labelTarget || !context.categoryValue) {
+	      return;
+	    }
+
+	    unsetCategoryValue(shape, context);
 	  });
 
 
@@ -37908,14 +39914,12 @@
 
 	GroupBehavior.$inject = [
 	  'bpmnFactory',
-	  'bpmnjs',
-	  'elementRegistry',
 	  'eventBus',
 	  'injector',
 	  'moddleCopy'
 	];
 
-	e$2(GroupBehavior, CommandInterceptor);
+	e$3(GroupBehavior, CommandInterceptor);
 
 	/**
 	 * @typedef {import('diagram-js/lib/util/Types').Point} Point
@@ -38077,7 +40081,7 @@
 
 	IsHorizontalFix.$inject = [ 'eventBus' ];
 
-	e$2(IsHorizontalFix, CommandInterceptor);
+	e$3(IsHorizontalFix, CommandInterceptor);
 
 	/**
 	 * @typedef {import('diagram-js/lib/util/Types').Point} Point
@@ -38585,10 +40589,10 @@
 	}
 
 	/**
-	 * @typedef {import('../model/Types').Shape} Shape
+	 * @typedef {import('../model/Types.js').Shape} Shape
 	 *
-	 * @typedef {import('../util/Types').Point} Point
-	 * @typedef {import('../util/Types').Rect} Rect
+	 * @typedef {import('./Types.js').Point} Point
+	 * @typedef {import('./Types.js').Rect} Rect
 	 */
 
 	/**
@@ -38720,6 +40724,162 @@
 
 	function isVerticallyMoved(oldTRBL, newTRBL) {
 	  return oldTRBL.top !== newTRBL.top && oldTRBL.bottom !== newTRBL.bottom;
+	}
+
+	/**
+	 * @typedef {import('diagram-js/lib/util/Types').Point} Point
+	 * @typedef {import('diagram-js/lib/util/Types').Rect} Rect
+	 *
+	 * @typedef {Point[]} Line
+	 */
+
+	/**
+	 * Generates the nearest point (reference point) for a given point
+	 * onto a given set of lines.
+	 *
+	 * The reference point is clamped to the actual line segments, i.e. it
+	 * always lies on one of the given lines (docking to a segment end /
+	 * bendpoint if necessary) instead of on the infinite line extending a
+	 * segment.
+	 *
+	 * @param {Point} point
+	 * @param {Line[]} lines
+	 *
+	 * @return {Point|undefined}
+	 */
+	function getReferencePoint$1(point, lines) {
+
+	  if (!lines.length) {
+	    return;
+	  }
+
+	  var nearestLine = getNearestLine(point, lines);
+
+	  return getClosestPointOnLine(point, nearestLine);
+	}
+
+	/**
+	 * Convert the given bounds to a lines array containing all edges.
+	 *
+	 * @param {Rect|Point} bounds
+	 *
+	 * @return {Line[]}
+	 */
+	function asEdges(bounds) {
+	  return [
+	    [ // top
+	      {
+	        x: bounds.x,
+	        y: bounds.y
+	      },
+	      {
+	        x: bounds.x + (bounds.width || 0),
+	        y: bounds.y
+	      }
+	    ],
+	    [ // right
+	      {
+	        x: bounds.x + (bounds.width || 0),
+	        y: bounds.y
+	      },
+	      {
+	        x: bounds.x + (bounds.width || 0),
+	        y: bounds.y + (bounds.height || 0)
+	      }
+	    ],
+	    [ // bottom
+	      {
+	        x: bounds.x,
+	        y: bounds.y + (bounds.height || 0)
+	      },
+	      {
+	        x: bounds.x + (bounds.width || 0),
+	        y: bounds.y + (bounds.height || 0)
+	      }
+	    ],
+	    [ // left
+	      {
+	        x: bounds.x,
+	        y: bounds.y
+	      },
+	      {
+	        x: bounds.x,
+	        y: bounds.y + (bounds.height || 0)
+	      }
+	    ]
+	  ];
+	}
+
+	/**
+	 * Convert the given waypoints to a lines array containing all segments.
+	 *
+	 * @param {Point[]} waypoints
+	 *
+	 * @return {Line[]}
+	 */
+	function asLines(waypoints) {
+	  var lines = [];
+
+	  for (var i = 0; i < waypoints.length - 1; i++) {
+	    lines.push([ waypoints[i], waypoints[i + 1] ]);
+	  }
+
+	  return lines;
+	}
+
+	/**
+	 * Returns the nearest line for a given point by the distance to the
+	 * closest point on each (clamped) line segment.
+	 *
+	 * @param {Point} point
+	 * @param {Line[]} lines
+	 *
+	 * @return {Line}
+	 */
+	function getNearestLine(point, lines) {
+
+	  var distances = lines.map(function(line) {
+	    return {
+	      line: line,
+	      distance: getDistancePointPoint(point, getClosestPointOnLine(point, line))
+	    };
+	  });
+
+	  var sorted = sortBy(distances, 'distance');
+
+	  return sorted[0].line;
+	}
+
+	/**
+	 * Returns the point on a line segment that is closest to the given point,
+	 * clamped to the segment's start and end.
+	 *
+	 * @param {Point} point
+	 * @param {Line} line
+	 *
+	 * @return {Point}
+	 */
+	function getClosestPointOnLine(point, line) {
+	  var start = line[0],
+	      end = line[1];
+
+	  var dx = end.x - start.x,
+	      dy = end.y - start.y;
+
+	  var lengthSquared = dx * dx + dy * dy;
+
+	  if (lengthSquared === 0) {
+	    return { x: start.x, y: start.y };
+	  }
+
+	  var t = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared;
+
+	  t = Math.max(0, Math.min(1, t));
+
+	  return {
+	    x: start.x + t * dx,
+	    y: start.y + t * dy
+	  };
 	}
 
 	var NAME_PROPERTY = 'name';
@@ -38948,7 +41108,7 @@
 
 	}
 
-	e$2(LabelBehavior, CommandInterceptor);
+	e$3(LabelBehavior, CommandInterceptor);
 
 	LabelBehavior.$inject = [
 	  'eventBus',
@@ -38974,99 +41134,6 @@
 	  var newReferencePoint = getNewAttachPoint(referencePoint, oldBounds, newBounds);
 
 	  return roundPoint(delta(newReferencePoint, referencePoint));
-	}
-
-	/**
-	 * Generates the nearest point (reference point) for a given point
-	 * onto given set of lines
-	 *
-	 * @param {Point} point
-	 * @param {Line[]} lines
-	 *
-	 * @return {Point}
-	 */
-	function getReferencePoint$1(point, lines) {
-
-	  if (!lines.length) {
-	    return;
-	  }
-
-	  var nearestLine = getNearestLine(point, lines);
-
-	  return perpendicularFoot(point, nearestLine);
-	}
-
-	/**
-	 * Convert the given bounds to a lines array containing all edges
-	 *
-	 * @param {Rect|Point} bounds
-	 *
-	 * @return {Line[]}
-	 */
-	function asEdges(bounds) {
-	  return [
-	    [ // top
-	      {
-	        x: bounds.x,
-	        y: bounds.y
-	      },
-	      {
-	        x: bounds.x + (bounds.width || 0),
-	        y: bounds.y
-	      }
-	    ],
-	    [ // right
-	      {
-	        x: bounds.x + (bounds.width || 0),
-	        y: bounds.y
-	      },
-	      {
-	        x: bounds.x + (bounds.width || 0),
-	        y: bounds.y + (bounds.height || 0)
-	      }
-	    ],
-	    [ // bottom
-	      {
-	        x: bounds.x,
-	        y: bounds.y + (bounds.height || 0)
-	      },
-	      {
-	        x: bounds.x + (bounds.width || 0),
-	        y: bounds.y + (bounds.height || 0)
-	      }
-	    ],
-	    [ // left
-	      {
-	        x: bounds.x,
-	        y: bounds.y
-	      },
-	      {
-	        x: bounds.x,
-	        y: bounds.y + (bounds.height || 0)
-	      }
-	    ]
-	  ];
-	}
-
-	/**
-	 * Returns the nearest line for a given point by distance
-	 * @param {Point} point
-	 * @param {Line[]} lines
-	 *
-	 * @return {Line}
-	 */
-	function getNearestLine(point, lines) {
-
-	  var distances = lines.map(function(l) {
-	    return {
-	      line: l,
-	      distance: getDistancePointLine(point, l)
-	    };
-	  });
-
-	  var sorted = sortBy(distances, 'distance');
-
-	  return sorted[0].line;
 	}
 
 	/**
@@ -39194,7 +41261,7 @@
 
 	}
 
-	e$2(LayoutConnectionBehavior, CommandInterceptor);
+	e$3(LayoutConnectionBehavior, CommandInterceptor);
 
 	LayoutConnectionBehavior.$inject = [
 	  'eventBus',
@@ -39202,11 +41269,11 @@
 	];
 
 	/**
-	 * @typedef {import('../../../../core/Types').ConnectionLike} Connection
-	 * @typedef {import('../../../../core/Types').ShapeLike} Shape
+	 * @typedef {import('../../../../core/Types.js').ConnectionLike} Connection
+	 * @typedef {import('../../../../core/Types.js').ShapeLike} Shape
 	 *
-	 * @typedef {import('../../../../util/Types').Point} Point
-	 * @typedef {import('../../../../util/Types').Rect} Rect
+	 * @typedef {import('../../../../util/Types.js').Point} Point
+	 * @typedef {import('../../../../util/Types.js').Rect} Rect
 	 */
 
 	/**
@@ -39359,7 +41426,7 @@
 
 	MessageFlowBehavior.$inject = [ 'eventBus', 'modeling' ];
 
-	e$2(MessageFlowBehavior, CommandInterceptor);
+	e$3(MessageFlowBehavior, CommandInterceptor);
 
 	// helpers //////////
 
@@ -39371,7 +41438,7 @@
 	}
 
 	function getMessageFlows(parent) {
-	  var elements = selfAndAllChildren([ parent ], false);
+	  var elements = selfAndAllChildren([ parent ]);
 
 	  var incoming = [],
 	      outgoing = [];
@@ -39465,7 +41532,7 @@
 
 	NonInterruptingBehavior.$inject = [ 'injector', 'modeling' ];
 
-	e$2(NonInterruptingBehavior, CommandInterceptor);
+	e$3(NonInterruptingBehavior, CommandInterceptor);
 
 	/**
 	 * @typedef {import('diagram-js/lib/core/EventBus').default} EventBus
@@ -39497,7 +41564,7 @@
 	  }, true);
 	}
 
-	e$2(RemoveEmbeddedLabelBoundsBehavior, CommandInterceptor);
+	e$3(RemoveEmbeddedLabelBoundsBehavior, CommandInterceptor);
 
 	RemoveEmbeddedLabelBoundsBehavior.$inject = [
 	  'eventBus',
@@ -39552,7 +41619,7 @@
 
 	}
 
-	e$2(RemoveElementBehavior, CommandInterceptor);
+	e$3(RemoveElementBehavior, CommandInterceptor);
 
 	RemoveElementBehavior.$inject = [
 	  'eventBus',
@@ -39642,7 +41709,7 @@
 
 	RemoveParticipantBehavior.$inject = [ 'eventBus', 'modeling' ];
 
-	e$2(RemoveParticipantBehavior, CommandInterceptor);
+	e$3(RemoveParticipantBehavior, CommandInterceptor);
 
 	/**
 	 * @typedef {import('diagram-js/lib/core/EventBus').default} EventBus
@@ -39818,7 +41885,7 @@
 	  });
 	}
 
-	e$2(ReplaceConnectionBehavior, CommandInterceptor);
+	e$3(ReplaceConnectionBehavior, CommandInterceptor);
 
 	ReplaceConnectionBehavior.$inject = [
 	  'eventBus',
@@ -39931,7 +41998,7 @@
 	  });
 	}
 
-	e$2(ReplaceElementBehaviour, CommandInterceptor);
+	e$3(ReplaceElementBehaviour, CommandInterceptor);
 
 	ReplaceElementBehaviour.prototype._replaceElements = function(elements, newElements) {
 	  var elementRegistry = this._elementRegistry,
@@ -39964,7 +42031,7 @@
 	  'selection'
 	];
 
-	var HIGH_PRIORITY$f = 1500;
+	var HIGH_PRIORITY$g = 1500;
 
 	/**
 	 * @typedef {import('diagram-js/lib/core/EventBus').default} EventBus
@@ -40017,7 +42084,7 @@
 	 * @param {EventBus} eventBus
 	 */
 	function ResizeBehavior$1(eventBus) {
-	  eventBus.on('resize.start', HIGH_PRIORITY$f, function(event) {
+	  eventBus.on('resize.start', HIGH_PRIORITY$g, function(event) {
 	    var context = event.context,
 	        shape = context.shape,
 	        direction = context.direction,
@@ -40289,7 +42356,7 @@
 	 * @typedef {import('diagram-js/lib/util/Types').DirectionTRBL} DirectionTRBL
 	 */
 
-	var LOW_PRIORITY$g = 500;
+	var LOW_PRIORITY$h = 500;
 
 
 	/**
@@ -40419,7 +42486,7 @@
 	    }
 	  });
 
-	  eventBus.on('copyPaste.pasteElement', LOW_PRIORITY$g, function(context) {
+	  eventBus.on('copyPaste.pasteElement', LOW_PRIORITY$h, function(context) {
 	    var descriptor = context.descriptor,
 	        businessObject = descriptor.businessObject,
 	        referencedRootElement = descriptor.referencedRootElement;
@@ -40449,7 +42516,7 @@
 	  'bpmnFactory'
 	];
 
-	e$2(RootElementReferenceBehavior, CommandInterceptor);
+	e$3(RootElementReferenceBehavior, CommandInterceptor);
 
 	// helpers //////////
 
@@ -40664,8 +42731,8 @@
 	 * @typedef {import('../../../model/Types').ModdleElement} ModdleElement
 	 */
 
-	var LOW_PRIORITY$f = 400;
-	var HIGH_PRIORITY$e = 600;
+	var LOW_PRIORITY$g = 400;
+	var HIGH_PRIORITY$f = 600;
 
 	var DEFAULT_POSITION = {
 	  x: 180,
@@ -40939,7 +43006,7 @@
 
 
 	  // create/remove plane for the subprocess
-	  this.executed('shape.toggleCollapse', LOW_PRIORITY$f, function(context) {
+	  this.executed('shape.toggleCollapse', LOW_PRIORITY$g, function(context) {
 	    var shape = context.shape;
 
 	    if (!is(shape, 'bpmn:SubProcess')) {
@@ -40957,7 +43024,7 @@
 
 
 	  // create/remove plane for the subprocess
-	  this.reverted('shape.toggleCollapse', LOW_PRIORITY$f, function(context) {
+	  this.reverted('shape.toggleCollapse', LOW_PRIORITY$g, function(context) {
 	    var shape = context.shape;
 
 	    if (!is(shape, 'bpmn:SubProcess')) {
@@ -40974,7 +43041,7 @@
 	  }, true);
 
 	  // move elements between planes
-	  this.postExecuted('shape.toggleCollapse', HIGH_PRIORITY$e, function(context) {
+	  this.postExecuted('shape.toggleCollapse', HIGH_PRIORITY$f, function(context) {
 	    var shape = context.shape;
 
 	    if (!is(shape, 'bpmn:SubProcess')) {
@@ -41076,7 +43143,7 @@
 
 	}
 
-	e$2(SubProcessPlaneBehavior, CommandInterceptor);
+	e$3(SubProcessPlaneBehavior, CommandInterceptor);
 
 	/**
 	 * Moves the given elements to the target.
@@ -41313,7 +43380,7 @@
 	 * @return {Element[]}
 	 */
 	function getExternalLabels(element) {
-	  return selfAndChildren(element.children || [], true)
+	  return selfAndChildren(element.children || [])
 	    .reduce(function(labels, child) {
 	      if (child.label && child.label.parent !== element) {
 	        labels.push(child.label);
@@ -41360,7 +43427,7 @@
 	  'modeling'
 	];
 
-	e$2(SubProcessStartEventBehavior, CommandInterceptor);
+	e$3(SubProcessStartEventBehavior, CommandInterceptor);
 
 	// helpers //////////
 
@@ -41431,7 +43498,7 @@
 	  });
 	}
 
-	e$2(TextAnnotationBehavior, CommandInterceptor);
+	e$3(TextAnnotationBehavior, CommandInterceptor);
 
 	TextAnnotationBehavior.$inject = [
 	  'eventBus',
@@ -41508,7 +43575,7 @@
 
 	}
 
-	e$2(ToggleCollapseConnectionBehaviour, CommandInterceptor);
+	e$3(ToggleCollapseConnectionBehaviour, CommandInterceptor);
 
 	ToggleCollapseConnectionBehaviour.$inject = [
 	  'eventBus',
@@ -41521,7 +43588,7 @@
 	 * @typedef {import('../Modeling').default} Modeling
 	 */
 
-	var LOW_PRIORITY$e = 500;
+	var LOW_PRIORITY$f = 500;
 
 	/**
 	 * @param {EventBus} eventBus
@@ -41582,7 +43649,7 @@
 	    };
 	  }
 
-	  this.executed([ 'shape.toggleCollapse' ], LOW_PRIORITY$e, function(e) {
+	  this.executed([ 'shape.toggleCollapse' ], LOW_PRIORITY$f, function(e) {
 
 	    var context = e.context,
 	        shape = context.shape;
@@ -41605,7 +43672,7 @@
 	    }
 	  });
 
-	  this.reverted([ 'shape.toggleCollapse' ], LOW_PRIORITY$e, function(e) {
+	  this.reverted([ 'shape.toggleCollapse' ], LOW_PRIORITY$f, function(e) {
 
 	    var context = e.context;
 	    var shape = context.shape;
@@ -41620,7 +43687,7 @@
 	    }
 	  });
 
-	  this.postExecuted([ 'shape.toggleCollapse' ], LOW_PRIORITY$e, function(e) {
+	  this.postExecuted([ 'shape.toggleCollapse' ], LOW_PRIORITY$f, function(e) {
 	    var shape = e.context.shape,
 	        defaultSize = elementFactory.getDefaultSize(shape),
 	        newBounds;
@@ -41643,7 +43710,7 @@
 	}
 
 
-	e$2(ToggleElementCollapseBehaviour, CommandInterceptor);
+	e$3(ToggleElementCollapseBehaviour, CommandInterceptor);
 
 	ToggleElementCollapseBehaviour.$inject = [
 	  'eventBus',
@@ -41714,7 +43781,7 @@
 	  });
 	}
 
-	e$2(UnclaimIdBehavior, CommandInterceptor);
+	e$3(UnclaimIdBehavior, CommandInterceptor);
 
 	UnclaimIdBehavior.$inject = [ 'canvas', 'injector', 'moddle', 'modeling' ];
 
@@ -41748,7 +43815,7 @@
 	  });
 	}
 
-	e$2(DeleteSequenceFlowBehavior, CommandInterceptor);
+	e$3(DeleteSequenceFlowBehavior, CommandInterceptor);
 
 	DeleteSequenceFlowBehavior.$inject = [
 	  'eventBus',
@@ -41775,12 +43842,31 @@
 	 * @typedef {import('../Modeling').default} Modeling
 	 */
 
-	var LOW_PRIORITY$d = 500,
-	    HIGH_PRIORITY$d = 5000;
+	var LOW_PRIORITY$e = 500,
+	    HIGH_PRIORITY$e = 5000;
 
+	// Commands that provide a shape whose lane references must be updated.
+	var laneRefShapeEvents = [
+	  'shape.create',
+	  'shape.delete',
+	  'shape.move',
+	  'shape.resize'
+	];
+
+	// Commands that bracket a complete lane reference update, including nested commands.
+	var laneRefUpdateEvents = [
+	  ...laneRefShapeEvents,
+	  'spaceTool',
+	  'lane.add',
+	  'lane.resize',
+	  'lane.split',
+	  'elements.create',
+	  'elements.delete',
+	  'elements.move'
+	];
 
 	/**
-	 * BPMN specific delete lane behavior.
+	 * Synchronizes lane flow node references after geometry changes.
 	 *
 	 * @param {EventBus} eventBus
 	 * @param {Modeling} modeling
@@ -41789,18 +43875,11 @@
 
 	  CommandInterceptor.call(this, eventBus);
 
-	  /**
-	   * Update Lane#flowNodeRefs and FlowNode#lanes with every flow node
-	   * move/resize and lane move/resize. Groups elements to recompute containments
-	   * as efficient as possible.
-	   */
-
-	  // the update context
 	  var context;
 
 
 	  function initContext() {
-	    context = context || new UpdateContext();
+	    context = context || new UpdateContext$1();
 	    context.enter();
 
 	    return context;
@@ -41832,40 +43911,26 @@
 	  }
 
 
-	  var laneRefUpdateEvents = [
-	    'spaceTool',
-	    'lane.add',
-	    'lane.resize',
-	    'lane.split',
-	    'elements.create',
-	    'elements.delete',
-	    'elements.move',
-	    'shape.create',
-	    'shape.delete',
-	    'shape.move',
-	    'shape.resize'
-	  ];
-
-
-	  // listen to a lot of stuff to group lane updates
-
-	  this.preExecute(laneRefUpdateEvents, HIGH_PRIORITY$d, function(event) {
+	  /**
+	   * Sets up the context for lane reference updates before executing commands
+	   * that may affect them.
+	   */
+	  this.preExecute(laneRefUpdateEvents, HIGH_PRIORITY$e, function() {
 	    initContext();
 	  });
 
-	  this.postExecuted(laneRefUpdateEvents, LOW_PRIORITY$d, function(event) {
+	  /**
+	   * Releases the context for lane reference updates after executing commands
+	   * that may affect them.
+	   */
+	  this.postExecuted(laneRefUpdateEvents, LOW_PRIORITY$e, function() {
 	    releaseContext();
 	  });
 
-
-	  // Mark flow nodes + lanes that need an update
-
-	  this.preExecute([
-	    'shape.create',
-	    'shape.move',
-	    'shape.delete',
-	    'shape.resize'
-	  ], function(event) {
+	  /**
+	   * Handles updates to lane references for shapes.
+	   */
+	  this.preExecute(laneRefShapeEvents, function(event) {
 
 	    var context = event.context,
 	        shape = context.shape;
@@ -41873,7 +43938,7 @@
 	    var updateContext = getContext();
 
 	    // no need to update labels
-	    if (shape.labelTarget) {
+	    if (!shape || shape.labelTarget) {
 	      return;
 	    }
 
@@ -41892,10 +43957,10 @@
 	  'modeling'
 	];
 
-	e$2(UpdateFlowNodeRefsBehavior, CommandInterceptor);
+	e$3(UpdateFlowNodeRefsBehavior, CommandInterceptor);
 
 
-	function UpdateContext() {
+	function UpdateContext$1() {
 
 	  this.flowNodes = [];
 	  this.lanes = [];
@@ -41908,6 +43973,168 @@
 
 	  this.addFlowNode = function(flowNode) {
 	    this.flowNodes.push(flowNode);
+	  };
+
+	  this.enter = function() {
+	    this.counter++;
+	  };
+
+	  this.leave = function() {
+	    this.counter--;
+
+	    return !this.counter;
+	  };
+	}
+
+	/**
+	 * @typedef {import('diagram-js/lib/core/EventBus').default} EventBus
+	 * @typedef {import('../Modeling').default} Modeling
+	 */
+
+	var LOW_PRIORITY$d = 500,
+	    HIGH_PRIORITY$d = 5000;
+
+	// Commands that provide a shape or connection whose references must be updated.
+	var categoryValueRefShapeAndConnectionEvents = [
+	  'connection.create',
+	  'connection.delete',
+	  'connection.layout',
+	  'connection.move',
+	  'connection.reconnect',
+	  'connection.updateWaypoints',
+	  'shape.create',
+	  'shape.delete',
+	  'shape.move',
+	  'shape.resize'
+	];
+
+	// Commands that bracket a complete reference update, including nested commands.
+	var categoryValueRefUpdateEvents = [
+	  ...categoryValueRefShapeAndConnectionEvents,
+	  'elements.create',
+	  'elements.delete',
+	  'elements.move',
+	  'label.create',
+	  'spaceTool'
+	];
+
+	/**
+	 * Synchronizes group category references after geometry changes.
+	 *
+	 * @param {EventBus} eventBus
+	 * @param {Modeling} modeling
+	 */
+	function UpdateCategoryValueRefsBehavior(eventBus, modeling) {
+
+	  CommandInterceptor.call(this, eventBus);
+
+	  var context;
+
+	  function initContext() {
+	    context = context || new UpdateContext();
+	    context.enter();
+
+	    return context;
+	  }
+
+	  function getContext() {
+	    if (!context) {
+	      throw new Error('out of bounds release');
+	    }
+
+	    return context;
+	  }
+
+	  function releaseContext() {
+	    if (!context) {
+	      throw new Error('out of bounds release');
+	    }
+
+	    var triggerUpdate = context.leave();
+
+	    if (triggerUpdate) {
+	      modeling.updateCategoryValueRefs(
+	        Array.from(context.affectedFlowElements),
+	        Array.from(context.affectedGroupEntries.values())
+	      );
+
+	      context = null;
+	    }
+
+	    return triggerUpdate;
+	  }
+
+	  /**
+	   * Sets up the context for category value reference updates before executing
+	   * commands that may affect them.
+	   */
+	  this.preExecute(categoryValueRefUpdateEvents, HIGH_PRIORITY$d, function() {
+	    initContext();
+	  });
+
+	  /**
+	   * Releases the context for category value reference updates after executing
+	   * commands that may affect them.
+	   */
+	  this.postExecuted(categoryValueRefUpdateEvents, LOW_PRIORITY$d, function() {
+	    releaseContext();
+	  });
+
+	  /**
+	   * Handles updates to category value references for shapes and connections.
+	   */
+	  this.preExecute(categoryValueRefShapeAndConnectionEvents, function(event) {
+	    var shape = event.context.connection || event.context.shape,
+	        updateContext = getContext();
+
+	    if (!shape || shape.labelTarget) {
+	      return;
+	    }
+
+	    if (is(shape, 'bpmn:FlowElement')) {
+	      updateContext.addFlowElement(shape);
+	    }
+
+	    if (is(shape, 'bpmn:Group')) {
+	      updateContext.addGroup(shape);
+	    }
+	  });
+
+	  this.preExecute('label.create', function(event) {
+	    var labelTarget = event.context.labelTarget;
+
+	    if (is(labelTarget, 'bpmn:Group')) {
+	      getContext().addGroup(labelTarget);
+	    }
+	  });
+	}
+
+	UpdateCategoryValueRefsBehavior.$inject = [
+	  'eventBus',
+	  'modeling'
+	];
+
+	e$3(UpdateCategoryValueRefsBehavior, CommandInterceptor);
+
+
+	function UpdateContext() {
+
+	  this.affectedFlowElements = new Set();
+	  this.affectedGroupEntries = new Map();
+
+	  this.counter = 0;
+
+	  this.addFlowElement = function(flowElement) {
+	    this.affectedFlowElements.add(flowElement);
+	  };
+
+	  this.addGroup = function(group) {
+	    if (!this.affectedGroupEntries.has(group)) {
+	      this.affectedGroupEntries.set(group, {
+	        categoryValue: group.businessObject.categoryValueRef,
+	        groupShape: group
+	      });
+	    }
 	  };
 
 	  this.enter = function() {
@@ -41951,7 +44178,7 @@
 	  });
 	}
 
-	e$2(SetCompensationActivityAfterPasteBehavior, CommandInterceptor);
+	e$3(SetCompensationActivityAfterPasteBehavior, CommandInterceptor);
 
 	SetCompensationActivityAfterPasteBehavior.$inject = [
 	  'eventBus',
@@ -41992,6 +44219,7 @@
 	    'associationBehavior',
 	    'attachEventBehavior',
 	    'boundaryEventBehavior',
+	    'categoryRootElementReferenceBehavior',
 	    'compensateBoundaryEventBehaviour',
 	    'createBehavior',
 	    'createDataObjectBehavior',
@@ -42026,6 +44254,7 @@
 	    'toggleElementCollapseBehaviour',
 	    'unclaimIdBehavior',
 	    'updateFlowNodeRefsBehavior',
+	    'updateCategoryValueRefsBehavior',
 	    'unsetDefaultFlowBehavior',
 	    'setCompensationActivityAfterPasteBehavior'
 	  ],
@@ -42035,6 +44264,7 @@
 	  attachEventBehavior: [ 'type', AttachEventBehavior ],
 	  artifactBehavior: [ 'type', ArtifactBehavior ],
 	  boundaryEventBehavior: [ 'type', BoundaryEventBehavior ],
+	  categoryRootElementReferenceBehavior: [ 'type', CategoryRootElementReferenceBehavior ],
 	  compensateBoundaryEventBehaviour: [ 'type', CompensateBoundaryEventBehavior ],
 	  createBehavior: [ 'type', CreateBehavior ],
 	  createDataObjectBehavior: [ 'type', CreateDataObjectBehavior ],
@@ -42070,6 +44300,7 @@
 	  unclaimIdBehavior: [ 'type', UnclaimIdBehavior ],
 	  unsetDefaultFlowBehavior: [ 'type', DeleteSequenceFlowBehavior ],
 	  updateFlowNodeRefsBehavior: [ 'type', UpdateFlowNodeRefsBehavior ],
+	  updateCategoryValueRefsBehavior: [ 'type', UpdateCategoryValueRefsBehavior ],
 	  setCompensationActivityAfterPasteBehavior: [ 'type', SetCompensationActivityAfterPasteBehavior ]
 	};
 
@@ -42128,7 +44359,7 @@
 	  RuleProvider.call(this, eventBus);
 	}
 
-	e$2(BpmnRules, RuleProvider);
+	e$3(BpmnRules, RuleProvider);
 
 	BpmnRules.$inject = [ 'eventBus' ];
 
@@ -42995,9 +45226,14 @@
 	    return false;
 	  }
 
-	  // allow default move check to start move operation
-	  if (!target) {
+	  // allow move to start when there is no target yet (`undefined`)
+	  if (target === undefined) {
 	    return true;
+	  }
+
+	  // disallow dropping outside the canvas (`null` target)
+	  if (target === null) {
+	    return false;
 	  }
 
 	  return elements.every(function(element) {
@@ -43224,7 +45460,7 @@
 	 *
 	 * @return {boolean}
 	 */
-	function includes$5(elements, element) {
+	function includes$2(elements, element) {
 	  return (elements && element) && elements.indexOf(element) !== -1;
 	}
 
@@ -43239,11 +45475,49 @@
 	    return true;
 	  }
 
-	  if (is(element, 'bpmn:Lane') && !includes$5(elements, element.parent)) {
+	  if (is(element, 'bpmn:Lane') && !includes$2(elements, element.parent)) {
+	    return false;
+	  }
+
+	  // do not copy message flows unless both connected participants are copied,
+	  // too; otherwise they would end up in an invalid organizational context
+	  if (is(element, 'bpmn:MessageFlow') && !canCopyMessageFlow(elements, element)) {
 	    return false;
 	  }
 
 	  return true;
+	}
+
+	/**
+	 * A message flow may only be copied if both of its participants are copied,
+	 * too. Otherwise it would be pasted into an invalid organizational context,
+	 * e.g. a plain process.
+	 *
+	 * @param {Element[]} elements
+	 * @param {Connection} connection
+	 *
+	 * @return {boolean}
+	 */
+	function canCopyMessageFlow(elements, connection) {
+	  var sourceParticipant = getParticipant(connection.source),
+	      targetParticipant = getParticipant(connection.target);
+
+	  return includes$2(elements, sourceParticipant) && includes$2(elements, targetParticipant);
+	}
+
+	/**
+	 * @param {Element} element
+	 *
+	 * @return {Element|null}
+	 */
+	function getParticipant(element) {
+	  for (; element; element = element.parent) {
+	    if (is(element, 'bpmn:Participant')) {
+	      return element;
+	    }
+	  }
+
+	  return null;
 	}
 
 	/**
@@ -43290,7 +45564,7 @@
 	          elements,
 	          diElements;
 
-	      elements = selfAndAllChildren([ root ], false);
+	      elements = selfAndAllChildren([ root ]);
 
 	      // only bpmndi:Shape and bpmndi:Edge can be direct children of bpmndi:Plane
 	      elements = filter(elements, function(element) {
@@ -43314,10 +45588,10 @@
 	};
 
 	/**
-	 * @typedef {import('../../core/Types').ElementLike} Element
-	 * @typedef {import('../../core/Types').ShapeLike} Shape
+	 * @typedef {import('../../core/Types.js').ElementLike} Element
+	 * @typedef {import('../../core/Types.js').ShapeLike} Shape
 	 *
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 */
 
 	/**
@@ -43409,7 +45683,7 @@
 	  return null;
 	};
 
-	e$2(OrderingProvider, CommandInterceptor);
+	e$3(OrderingProvider, CommandInterceptor);
 
 	/**
 	 * @typedef {import('diagram-js/lib/core/Canvas').default} Canvas
@@ -43588,7 +45862,7 @@
 
 	BpmnOrderingProvider.$inject = [ 'eventBus', 'canvas' ];
 
-	e$2(BpmnOrderingProvider, OrderingProvider);
+	e$3(BpmnOrderingProvider, OrderingProvider);
 
 	var OrderingModule = {
 	  __init__: [ 'bpmnOrderingProvider' ],
@@ -43634,16 +45908,16 @@
 	    MARKER_NEW_PARENT$1 = 'new-parent';
 
 	/**
-	 * @typedef {import('../../core/Types').ElementLike} Element
-	 * @typedef {import('../../core/Types').ShapeLike} Shape
+	 * @typedef {import('../../core/Types.js').ElementLike} Element
+	 * @typedef {import('../../core/Types.js').ShapeLike} Shape
 	 *
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../dragging/Dragging').default} Dragging
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../modeling/Modeling').default} Modeling
-	 * @typedef {import('../rules/Rules').default} Rules
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../dragging/Dragging.js').default} Dragging
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
+	 * @typedef {import('../rules/Rules.js').default} Rules
 	 */
 
 	var PREFIX = 'create';
@@ -43995,11 +46269,11 @@
 	}
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../../core/GraphicsFactory').default} GraphicsFactory
-	 * @typedef {import('../preview-support/PreviewSupport').default} PreviewSupport
-	 * @typedef {import('../../draw/Styles').default} Styles
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../../core/GraphicsFactory.js').default} GraphicsFactory
+	 * @typedef {import('../preview-support/PreviewSupport.js').default} PreviewSupport
+	 * @typedef {import('../../draw/Styles.js').default} Styles
 	 */
 
 	var LOW_PRIORITY$c = 750;
@@ -44117,7 +46391,7 @@
 	};
 
 	/**
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 */
 
 	/**
@@ -44193,19 +46467,19 @@
 	};
 
 	/**
-	 * @typedef {import('../../core/Types').ElementLike} Element
-	 * @typedef {import('../../core/Types').ShapeLike} Shape
+	 * @typedef {import('../../core/Types.js').ElementLike} Element
+	 * @typedef {import('../../core/Types.js').ShapeLike} Shape
 	 *
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../clipboard/Clipboard').default} Clipboard
-	 * @typedef {import('../create/Create').default} Create
-	 * @typedef {import('../../core/ElementFactory').default} ElementFactory
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../modeling/Modeling').default} Modeling
-	 * @typedef {import('../mouse/Mouse').default} Mouse
-	 * @typedef {import('../rules/Rules').default} Rules
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../clipboard/Clipboard.js').default} Clipboard
+	 * @typedef {import('../create/Create.js').default} Create
+	 * @typedef {import('../../core/ElementFactory.js').default} ElementFactory
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
+	 * @typedef {import('../mouse/Mouse.js').default} Mouse
+	 * @typedef {import('../rules/Rules.js').default} Rules
 	 */
 
 	/**
@@ -44293,19 +46567,15 @@
 	  eventBus.on('copyPaste.copyElement', function(context) {
 	    var descriptor = context.descriptor,
 	        element = context.element,
-	        elements = context.elements;
+	        elementsSet = context.elementsSet;
 
 	    // default priority (priority = 1)
 	    descriptor.priority = 1;
 
 	    descriptor.id = element.id;
 
-	    var parentCopied = find(elements, function(e) {
-	      return e === element.parent;
-	    });
-
 	    // do NOT reference parent if parent wasn't copied
-	    if (parentCopied) {
+	    if (elementsSet.has(element.parent)) {
 	      descriptor.parent = element.parent.id;
 	    }
 
@@ -44657,31 +46927,29 @@
 	};
 
 	/**
-	 * Check wether element has relations to other elements e.g. attachers, labels and connections.
+	 * Check whether element has relations to other elements e.g. attachers, labels and connections.
 	 *
 	 * @param {Object} element
 	 * @param {Element[]} elements
+	 * @param {Set<Element>} [elementsSet] pre-computed set of `elements`; pass it
+	 * to avoid a linear scan per invocation
 	 *
 	 * @return {boolean}
 	 */
-	CopyPaste.prototype.hasRelations = function(element, elements) {
-	  var labelTarget,
-	      source,
-	      target;
+	CopyPaste.prototype.hasRelations = function(element, elements, elementsSet) {
+
+	  if (!elementsSet) {
+	    elementsSet = new Set(elements);
+	  }
 
 	  if (isConnection(element)) {
-	    source = find(elements, matchPattern({ id: element.source.id }));
-	    target = find(elements, matchPattern({ id: element.target.id }));
-
-	    if (!source || !target) {
+	    if (!elementsSet.has(element.source) || !elementsSet.has(element.target)) {
 	      return false;
 	    }
 	  }
 
 	  if (isLabel(element)) {
-	    labelTarget = find(elements, matchPattern({ id: element.labelTarget.id }));
-
-	    if (!labelTarget) {
+	    if (!elementsSet.has(element.labelTarget)) {
 	      return false;
 	    }
 	  }
@@ -44720,6 +46988,9 @@
 	  var tree = {},
 	      elementsData = [];
 
+	  // O(1) lookup of already added element data during the add phase
+	  var elementsDataMap = new Map();
+
 	  var parents = getParents$1(elements);
 
 	  function canCopy(element, elements) {
@@ -44731,17 +47002,18 @@
 
 	  function addElementData(element, depth) {
 
-	    // (1) check wether element has already been added
-	    var foundElementData = find(elementsData, function(elementsData) {
-	      return element === elementsData.element;
-	    });
+	    // (1) check whether element has already been added
+	    var foundElementData = elementsDataMap.get(element);
 
 	    // (2) add element if not already added
 	    if (!foundElementData) {
-	      elementsData.push({
+	      var elementData = {
 	        element: element,
 	        depth: depth
-	      });
+	      };
+
+	      elementsData.push(elementData);
+	      elementsDataMap.set(element, elementData);
 
 	      return;
 	    }
@@ -44750,10 +47022,13 @@
 	    if (foundElementData.depth < depth) {
 	      elementsData = removeElementData(foundElementData, elementsData);
 
-	      elementsData.push({
+	      var updatedElementData = {
 	        element: foundElementData.element,
 	        depth: depth
-	      });
+	      };
+
+	      elementsData.push(updatedElementData);
+	      elementsDataMap.set(element, updatedElementData);
 	    }
 	  }
 
@@ -44816,13 +47091,20 @@
 	  });
 
 	  // (2) copy elements
+	  //
+	  // build a Set of copied elements, kept in sync as unrelated elements are
+	  // pruned below, so both the `copyPaste.copyElement` listener and relation
+	  // checks resolve membership in O(1)
+	  var elementsSet = new Set(elements);
+
 	  elementsData = map(elementsData, function(elementData) {
 	    elementData.descriptor = {};
 
 	    self._eventBus.fire('copyPaste.copyElement', {
 	      descriptor: elementData.descriptor,
 	      element: elementData.element,
-	      elements: elements
+	      elements: elements,
+	      elementsSet: elementsSet
 	    });
 
 	    return elementData;
@@ -44841,14 +47123,16 @@
 	  forEach(elementsData, function(elementData) {
 	    var depth = elementData.depth;
 
-	    if (!self.hasRelations(elementData.element, elements)) {
+	    if (!self.hasRelations(elementData.element, elements, elementsSet)) {
 	      removeElement(elementData.element, elements);
+	      elementsSet.delete(elementData.element);
 
 	      return;
 	    }
 
 	    if (!canCopy(elementData.element, elements)) {
 	      removeElement(elementData.element, elements);
+	      elementsSet.delete(elementData.element);
 
 	      return;
 	    }
@@ -45389,9 +47673,9 @@
 
 	/**
 	 * @typedef {import('diagram-js/lib/core/EventBus').default} EventBus
-	 * @typedef {import('../modeling/Modeling').default} Modeling
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
 	 *
-	 * @typedef {import('../../core/Types').ShapeLike} Shape
+	 * @typedef {import('../../core/Types.js').ShapeLike} Shape
 	 */
 
 	var round$6 = Math.round;
@@ -45875,9 +48159,9 @@
 	};
 
 	/**
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 *
-	 * @typedef {import('../../core/EventBus').Event} Event
+	 * @typedef {import('../../core/EventBus.js').Event} Event
 	 */
 
 	var LOW_PRIORITY$a = 250;
@@ -46005,13 +48289,13 @@
 	};
 
 	/**
-	 * @typedef {import('../../core/Types').ConnectionLike} Connection
-	 * @typedef {import('../../core/Types').ShapeLike} Shape
+	 * @typedef {import('../../core/Types.js').ConnectionLike} Connection
+	 * @typedef {import('../../core/Types.js').ShapeLike} Shape
 	 *
-	 * @typedef {import('../../util/Types').Axis} Axis
-	 * @typedef {import('../../util/Types').Direction} Direction
-	 * @typedef {import('../../util/Types').Point} Point
-	 * @typedef {import('../../util/Types').Rect} Rect
+	 * @typedef {import('../../util/Types.js').Axis} Axis
+	 * @typedef {import('../../util/Types.js').Direction} Direction
+	 * @typedef {import('../../util/Types.js').Point} Point
+	 * @typedef {import('../../util/Types.js').Rect} Rect
 	 */
 
 
@@ -46060,7 +48344,15 @@
 	function getWaypointsUpdatingConnections(movingShapes, resizingShapes) {
 	  var waypointsUpdatingConnections = [];
 
-	  forEach(movingShapes.concat(resizingShapes), function(shape) {
+	  var adjustedShapes = new Set(movingShapes);
+
+	  forEach(resizingShapes, function(shape) {
+	    adjustedShapes.add(shape);
+	  });
+
+	  var seenConnections = new Set();
+
+	  adjustedShapes.forEach(function(shape) {
 	    var incoming = shape.incoming,
 	        outgoing = shape.outgoing;
 
@@ -46068,12 +48360,11 @@
 	      var source = connection.source,
 	          target = connection.target;
 
-	      if (includes$4(movingShapes, source) ||
-	        includes$4(movingShapes, target) ||
-	        includes$4(resizingShapes, source) ||
-	        includes$4(resizingShapes, target)) {
+	      if (adjustedShapes.has(source) || adjustedShapes.has(target)) {
 
-	        if (!includes$4(waypointsUpdatingConnections, connection)) {
+	        if (!seenConnections.has(connection)) {
+	          seenConnections.add(connection);
+
 	          waypointsUpdatingConnections.push(connection);
 	        }
 	      }
@@ -46081,10 +48372,6 @@
 	  });
 
 	  return waypointsUpdatingConnections;
-	}
-
-	function includes$4(array, item) {
-	  return array.indexOf(item) !== -1;
 	}
 
 	/**
@@ -46139,19 +48426,21 @@
 	}
 
 	/**
-	 * @typedef {import('../../core/Types').ShapeLike} Shape
+	 * @typedef {import('didi').Injector} Injector
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../dragging/Dragging').default} Dragging
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../modeling/Modeling').default} Modeling
-	 * @typedef {import('../mouse/Mouse').default} Mouse
-	 * @typedef {import('../rules/Rules').default} Rules
-	 * @typedef {import('../tool-manager/ToolManager').default} ToolManager
+	 * @typedef {import('../../core/Types.js').ShapeLike} Shape
 	 *
-	 * @typedef {import('../../util/Types').Axis} Axis
-	 * @typedef {import('../../util/Types').Direction} Direction
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../dragging/Dragging.js').default} Dragging
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
+	 * @typedef {import('../mouse/Mouse.js').default} Mouse
+	 * @typedef {import('../rules/Rules.js').default} Rules
+	 * @typedef {import('../tool-manager/ToolManager.js').default} ToolManager
+	 *
+	 * @typedef {import('../../util/Types.js').Axis} Axis
+	 * @typedef {import('../../util/Types.js').Direction} Direction
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 */
 
 	var abs$1 = Math.abs,
@@ -46358,7 +48647,7 @@
 	  }
 
 	  var children = [
-	    ...selfAndAllChildren(root, true),
+	    ...selfAndAllChildren(root),
 	    ...(root.attachers || [])
 	  ];
 
@@ -46405,24 +48694,30 @@
 	  var movingShapes = [],
 	      resizingShapes = [];
 
+	  var movingShapesSet = new Set(),
+	      resizingShapesSet = new Set();
+
 	  var attachers = [],
 	      connections = [];
 
 	  function moveShape(shape) {
-	    if (!movingShapes.includes(shape)) {
+	    if (!movingShapesSet.has(shape)) {
+	      movingShapesSet.add(shape);
 	      movingShapes.push(shape);
 	    }
 
 	    var label = shape.label;
 
 	    // move external label if its label target is moving
-	    if (label && !movingShapes.includes(label)) {
+	    if (label && !movingShapesSet.has(label)) {
+	      movingShapesSet.add(label);
 	      movingShapes.push(label);
 	    }
 	  }
 
 	  function resizeShape(shape) {
-	    if (!resizingShapes.includes(shape)) {
+	    if (!resizingShapesSet.has(shape)) {
+	      resizingShapesSet.add(shape);
 	      resizingShapes.push(shape);
 	    }
 	  }
@@ -46481,18 +48776,14 @@
 	    }
 	  });
 
-	  var allShapes = movingShapes.concat(resizingShapes);
-
 	  // move attacher if its mid is after space tool and its host is moving or resizing
 	  forEach(attachers, function(attacher) {
 	    var host = attacher.host;
 
-	    if (includes$3(allShapes, host)) {
+	    if (movingShapesSet.has(host) || resizingShapesSet.has(host)) {
 	      moveShape(attacher);
 	    }
 	  });
-
-	  allShapes = movingShapes.concat(resizingShapes);
 
 	  // move external label if its label target's (connection) source and target are moving
 	  forEach(connections, function(connection) {
@@ -46500,8 +48791,8 @@
 	        target = connection.target,
 	        label = connection.label;
 
-	    if (includes$3(allShapes, source)
-	      && includes$3(allShapes, target)
+	    if ((movingShapesSet.has(source) || resizingShapesSet.has(source))
+	      && (movingShapesSet.has(target) || resizingShapesSet.has(target))
 	      && label) {
 	      moveShape(label);
 	    }
@@ -46596,6 +48887,9 @@
 	      min,
 	      max;
 
+	  var movingShapesSet = new Set(movingShapes),
+	      resizingShapesSet = new Set(resizingShapes);
+
 	  forEach(resizingShapes, function(resizingShape) {
 	    var attachers = resizingShape.attachers,
 	        children = resizingShape.children;
@@ -46606,13 +48900,13 @@
 	    var nonMovingResizingChildren = filter(children, function(child) {
 	      return !isConnection(child) &&
 	        !isLabel(child) &&
-	        !includes$3(movingShapes, child) &&
-	        !includes$3(resizingShapes, child);
+	        !movingShapesSet.has(child) &&
+	        !resizingShapesSet.has(child);
 	    });
 
 	    // find children that are moving
 	    var movingChildren = filter(children, function(child) {
-	      return !isConnection(child) && !isLabel(child) && includes$3(movingShapes, child);
+	      return !isConnection(child) && !isLabel(child) && movingShapesSet.has(child);
 	    });
 
 	    var minOrMax,
@@ -46663,7 +48957,7 @@
 
 	    if (attachers && attachers.length) {
 	      attachers.forEach(function(attacher) {
-	        if (includes$3(movingShapes, attacher)) {
+	        if (movingShapesSet.has(attacher)) {
 	          movingAttachers.push(attacher);
 	        } else {
 	          nonMovingAttachers.push(attacher);
@@ -46738,10 +49032,6 @@
 	  return spaceToolConstraints;
 	}
 
-	function includes$3(array, item) {
-	  return array.indexOf(item) !== -1;
-	}
-
 	function isAttacher$1(element) {
 	  return !!element.host;
 	}
@@ -46752,10 +49042,10 @@
 	var LOW_PRIORITY$9 = 250;
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/ElementRegistry').default} ElementRegistry
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../../draw/Styles').default} Styles
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../../draw/Styles.js').default} Styles
 	 */
 
 	var max$1 = Math.max;
@@ -46862,53 +49152,30 @@
 	      // shapes
 	      addPreviewGfx(movingShapes, dragGroup);
 
-	      // connections
-	      var movingConnections = context.movingConnections = elementRegistry.filter(function(element) {
-	        var sourceIsMoving = false;
+	      // connections whose source *and* target are moving or resizing
+	      var adjustedShapes = new Set(movingShapes);
 
-	        forEach(movingShapes, function(shape) {
-	          forEach(shape.outgoing, function(connection) {
-	            if (element === connection) {
-	              sourceIsMoving = true;
-	            }
-	          });
-	        });
-
-	        var targetIsMoving = false;
-
-	        forEach(movingShapes, function(shape) {
-	          forEach(shape.incoming, function(connection) {
-	            if (element === connection) {
-	              targetIsMoving = true;
-	            }
-	          });
-	        });
-
-	        var sourceIsResizing = false;
-
-	        forEach(resizingShapes, function(shape) {
-	          forEach(shape.outgoing, function(connection) {
-	            if (element === connection) {
-	              sourceIsResizing = true;
-	            }
-	          });
-	        });
-
-	        var targetIsResizing = false;
-
-	        forEach(resizingShapes, function(shape) {
-	          forEach(shape.incoming, function(connection) {
-	            if (element === connection) {
-	              targetIsResizing = true;
-	            }
-	          });
-	        });
-
-	        return isConnection(element)
-	          && (sourceIsMoving || sourceIsResizing)
-	          && (targetIsMoving || targetIsResizing);
+	      forEach(resizingShapes, function(shape) {
+	        adjustedShapes.add(shape);
 	      });
 
+	      var seenConnections = new Set();
+
+	      var movingConnections = context.movingConnections = [];
+
+	      adjustedShapes.forEach(function(shape) {
+	        forEach(shape.outgoing, function(connection) {
+	          if (seenConnections.has(connection)
+	            || !isConnection(connection)
+	            || !adjustedShapes.has(connection.target)) {
+	            return;
+	          }
+
+	          seenConnections.add(connection);
+
+	          movingConnections.push(connection);
+	        });
+	      });
 
 	      addPreviewGfx(movingConnections, dragGroup);
 
@@ -47075,7 +49342,7 @@
 	  'canvas'
 	];
 
-	e$2(BpmnSpaceTool, SpaceTool);
+	e$3(BpmnSpaceTool, SpaceTool);
 
 	/**
 	 * @param {Shape[]} elements
@@ -47145,10 +49412,10 @@
 	/**
 	 * @typedef {import('didi').Injector} Injector
 	 *
-	 * @typedef {import('../core/Types').ElementLike} ElementLike
+	 * @typedef {import('../core/Types.js').ElementLike} ElementLike
 	 *
-	 * @typedef {import('../core/EventBus').default} EventBus
-	 * @typedef {import('./CommandHandler').default} CommandHandler
+	 * @typedef {import('../core/EventBus.js').default} EventBus
+	 * @typedef {import('./CommandHandler.js').default} CommandHandler
 	 *
 	 * @typedef { any } CommandContext
 	 * @typedef { {
@@ -47711,7 +49978,7 @@
 	 * may touch, i.e. remove multiple elements in the collection
 	 * at a time.
 	 *
-	 * @param {Object[]} [collection]
+	 * @param {Object[]|undefined} collection
 	 * @param {(element: Object) => void} removeFn
 	 *
 	 * @return {Object[]} the cleared collection
@@ -47723,7 +49990,7 @@
 	  }
 
 	  if (!collection) {
-	    return;
+	    return [];
 	  }
 
 	  var e;
@@ -47739,12 +50006,12 @@
 	    HIGH_PRIORITY$8 = 1400;
 
 	/**
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../model/Types.js').Element} Element
 	 *
 	 * @typedef {import('didi').Injector} Injector
 	 *
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../modeling/Modeling').default} Modeling
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
 	 */
 
 	/**
@@ -47777,28 +50044,26 @@
 	  movePreview && eventBus.on('shape.move.start', LOW_PRIORITY$8, function(e) {
 
 	    var context = e.context,
-	        shapes = context.shapes;
+	        shapeSet = new Set(context.shapes),
+	        labelSet = new Set();
 
-	    var labels = [];
+	    for (const shape of shapeSet) {
 
-	    forEach(shapes, function(element) {
+	      for (const label of shape.labels) {
 
-	      forEach(element.labels, function(label) {
-
-	        if (!label.hidden && context.shapes.indexOf(label) === -1) {
-	          labels.push(label);
+	        if (!label.hidden && !shapeSet.has(label)) {
+	          labelSet.add(label);
 	        }
 
-	        if (element.labelTarget) {
-	          labels.push(element);
+	        if (shape.labelTarget) {
+	          labelSet.add(shape);
 	        }
-	      });
-	    });
+	      }
+	    }
 
-	    forEach(labels, function(label) {
+	    for (const label of labelSet) {
 	      movePreview.makeDraggable(context, label, true);
-	    });
-
+	    }
 	  });
 
 	  // add all labels to move closure
@@ -47870,7 +50135,7 @@
 
 	}
 
-	e$2(LabelSupport, CommandInterceptor);
+	e$3(LabelSupport, CommandInterceptor);
 
 	LabelSupport.$inject = [
 	  'injector',
@@ -47889,12 +50154,13 @@
 	 * @return {Element[]} filtered
 	 */
 	function removeLabels(elements) {
+	  var elementsSet = new Set(elements);
 
 	  return filter(elements, function(element) {
 
 	    // filter out labels that are move together
 	    // with their label targets
-	    return elements.indexOf(element.labelTarget) === -1;
+	    return !elementsSet.has(element.labelTarget);
 	  });
 	}
 
@@ -47909,12 +50175,12 @@
 	/**
 	 * @typedef {import('didi').Injector} Injector
 	 *
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../model/Types.js').Element} Element
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../rules/Rules').default} Rules
-	 * @typedef {import('../modeling/Modeling').default} Modeling
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../rules/Rules.js').default} Rules
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
 	 */
 
 	var LOW_PRIORITY$7 = 251,
@@ -48033,7 +50299,7 @@
 	      attachers = filter(shapes, function(shape) {
 	        var host = shape.host;
 
-	        return isAttacher(shape) && !includes$2(shapes, host);
+	        return isAttacher(shape) && !includes$1(shapes, host);
 	      });
 	    }
 
@@ -48161,7 +50427,7 @@
 	  });
 	}
 
-	e$2(AttachSupport, CommandInterceptor);
+	e$3(AttachSupport, CommandInterceptor);
 
 	AttachSupport.$inject = [
 	  'injector',
@@ -48229,7 +50495,7 @@
 	  return !!shape.host;
 	}
 
-	function includes$2(array, item) {
+	function includes$1(array, item) {
 	  return array.indexOf(item) !== -1;
 	}
 
@@ -48691,9 +50957,36 @@
 	      di.set('label', undefined);
 	    }
 	  }
+
+	  // remove BPMNLabel on external label removal
+	  this.executed('shape.delete', ifBpmn(function(event) {
+	    const context = event.context,
+	          labelTarget = context.labelTarget,
+	          di = labelTarget && getDi(labelTarget),
+	          diLabel = di && di.get('label');
+
+	    if (!diLabel) {
+	      return;
+	    }
+
+	    context.oldDiLabel = diLabel;
+
+	    di.set('label', undefined);
+	  }));
+
+	  this.reverted('shape.delete', ifBpmn(function(event) {
+	    const {
+	      labelTarget,
+	      oldDiLabel
+	    } = event.context;
+
+	    if (oldDiLabel) {
+	      getDi(labelTarget).set('label', oldDiLabel);
+	    }
+	  }));
 	}
 
-	e$2(BpmnUpdater, CommandInterceptor);
+	e$3(BpmnUpdater, CommandInterceptor);
 
 	BpmnUpdater.$inject = [
 	  'eventBus',
@@ -49202,6 +51495,182 @@
 	/**
 	 * @typedef {import('diagram-js/lib/util/Types').Dimensions} Dimensions
 	 *
+	 * @typedef {import('../model/Types').Element} Element
+	 * @typedef {import('../model/Types').ModdleElement} ModdleElement
+	 */
+
+	/**
+	 * Default size of elements without an explicit default.
+	 *
+	 * @type {Dimensions}
+	 */
+	const DEFAULT_SIZE = { width: 100, height: 80 };
+
+	/**
+	 * @type {Dimensions}
+	 */
+	const DEFAULT_TASK_SIZE = { width: 100, height: 80 };
+
+	/**
+	 * @type {Dimensions}
+	 */
+	const DEFAULT_GATEWAY_SIZE = { width: 50, height: 50 };
+
+	/**
+	 * @type {Dimensions}
+	 */
+	const DEFAULT_EVENT_SIZE = { width: 36, height: 36 };
+
+	/**
+	 * @type {Dimensions}
+	 */
+	const DEFAULT_SUB_PROCESS_SIZE = { width: 350, height: 200 };
+
+	/**
+	 * @type {Dimensions}
+	 */
+	const DEFAULT_COLLAPSED_SUB_PROCESS_SIZE = { width: 100, height: 80 };
+
+	/**
+	 * @type {Dimensions}
+	 */
+	const DEFAULT_PARTICIPANT_SIZE = { width: 600, height: 250 };
+
+	/**
+	 * @type {Dimensions}
+	 */
+	const DEFAULT_VERTICAL_PARTICIPANT_SIZE = { width: 250, height: 600 };
+
+	/**
+	 * @type {Dimensions}
+	 */
+	const DEFAULT_COLLAPSED_PARTICIPANT_SIZE = { width: 400, height: 60 };
+
+	/**
+	 * @type {Dimensions}
+	 */
+	const DEFAULT_VERTICAL_COLLAPSED_PARTICIPANT_SIZE = { width: 60, height: 400 };
+
+	/**
+	 * @type {Dimensions}
+	 */
+	const DEFAULT_LANE_SIZE = { width: 400, height: 100 };
+
+	/**
+	 * @type {Dimensions}
+	 */
+	const DEFAULT_DATA_OBJECT_REFERENCE_SIZE = { width: 36, height: 50 };
+
+	/**
+	 * @type {Dimensions}
+	 */
+	const DEFAULT_DATA_STORE_REFERENCE_SIZE = { width: 50, height: 50 };
+
+	/**
+	 * @type {Dimensions}
+	 */
+	const DEFAULT_TEXT_ANNOTATION_SIZE = { width: 100, height: 40 };
+
+	/**
+	 * @type {Dimensions}
+	 */
+	const DEFAULT_GROUP_SIZE = { width: 300, height: 300 };
+
+
+	/**
+	 * Get the default size of a BPMN element.
+	 *
+	 * Elements without an explicit default, e.g. `bpmn:CallActivity`, fall back to
+	 * `DEFAULT_SIZE`.
+	 *
+	 * @overlord
+	 * @param {Element} element The element.
+	 * @param {ModdleElement} [di] The DI; defaults to the DI of the element.
+	 *
+	 * @return {Dimensions} Default width and height of the element.
+	 */
+
+	/**
+	 * Get the default size of a BPMN element.
+	 *
+	 * Elements without an explicit default, e.g. `bpmn:CallActivity`, fall back to
+	 * `DEFAULT_SIZE`.
+	 *
+	 * @param {ModdleElement} element The element.
+	 * @param {ModdleElement} di The DI.
+	 *
+	 * @return {Dimensions} Default width and height of the element.
+	 */
+	function getDefaultSize(element, di) {
+
+	  const bo = getBusinessObject(element);
+
+	  di = di || getDi(element);
+
+	  if (is(bo, 'bpmn:SubProcess')) {
+	    if (isExpanded(bo, di)) {
+	      return { ...DEFAULT_SUB_PROCESS_SIZE };
+	    } else {
+	      return { ...DEFAULT_COLLAPSED_SUB_PROCESS_SIZE };
+	    }
+	  }
+
+	  if (is(bo, 'bpmn:Task')) {
+	    return { ...DEFAULT_TASK_SIZE };
+	  }
+
+	  if (is(bo, 'bpmn:Gateway')) {
+	    return { ...DEFAULT_GATEWAY_SIZE };
+	  }
+
+	  if (is(bo, 'bpmn:Event')) {
+	    return { ...DEFAULT_EVENT_SIZE };
+	  }
+
+	  if (is(bo, 'bpmn:Participant')) {
+	    const isHorizontalPool = !di || di.isHorizontal === undefined || di.isHorizontal === true;
+
+	    if (isExpanded(bo, di)) {
+	      if (isHorizontalPool) {
+	        return { ...DEFAULT_PARTICIPANT_SIZE };
+	      }
+
+	      return { ...DEFAULT_VERTICAL_PARTICIPANT_SIZE };
+	    } else {
+	      if (isHorizontalPool) {
+	        return { ...DEFAULT_COLLAPSED_PARTICIPANT_SIZE };
+	      }
+
+	      return { ...DEFAULT_VERTICAL_COLLAPSED_PARTICIPANT_SIZE };
+	    }
+	  }
+
+	  if (is(bo, 'bpmn:Lane')) {
+	    return { ...DEFAULT_LANE_SIZE };
+	  }
+
+	  if (is(bo, 'bpmn:DataObjectReference')) {
+	    return { ...DEFAULT_DATA_OBJECT_REFERENCE_SIZE };
+	  }
+
+	  if (is(bo, 'bpmn:DataStoreReference')) {
+	    return { ...DEFAULT_DATA_STORE_REFERENCE_SIZE };
+	  }
+
+	  if (is(bo, 'bpmn:TextAnnotation')) {
+	    return { ...DEFAULT_TEXT_ANNOTATION_SIZE };
+	  }
+
+	  if (is(bo, 'bpmn:Group')) {
+	    return { ...DEFAULT_GROUP_SIZE };
+	  }
+
+	  return { ...DEFAULT_SIZE };
+	}
+
+	/**
+	 * @typedef {import('diagram-js/lib/util/Types').Dimensions} Dimensions
+	 *
 	 * @typedef {import('./BpmnFactory').default} BpmnFactory
 	 *
 	 * @typedef {import('../../model/Types').BpmnAttributes} BpmnAttributes
@@ -49234,7 +51703,7 @@
 	  this._moddle = moddle;
 	}
 
-	e$2(ElementFactory, ElementFactory$1);
+	e$3(ElementFactory, ElementFactory$1);
 
 	ElementFactory.$inject = [
 	  'bpmnFactory',
@@ -49330,8 +51799,6 @@
 	    }
 
 	    businessObject = this._bpmnFactory.create(attrs.type);
-
-	    ensureCompatDiRef(businessObject);
 	  }
 
 	  if (!isModdleDi(di)) {
@@ -49430,71 +51897,12 @@
 	 * Get the default size of a diagram element.
 	 *
 	 * @param {Element} element The element.
-	 * @param {ModdleElement} di The DI.
+	 * @param {ModdleElement} [di] The DI.
 	 *
 	 * @return {Dimensions} Default width and height of the element.
 	 */
 	ElementFactory.prototype.getDefaultSize = function(element, di) {
-
-	  var bo = getBusinessObject(element);
-	  di = di || getDi(element);
-
-	  if (is(bo, 'bpmn:SubProcess')) {
-	    if (isExpanded(bo, di)) {
-	      return { width: 350, height: 200 };
-	    } else {
-	      return { width: 100, height: 80 };
-	    }
-	  }
-
-	  if (is(bo, 'bpmn:Task')) {
-	    return { width: 100, height: 80 };
-	  }
-
-	  if (is(bo, 'bpmn:Gateway')) {
-	    return { width: 50, height: 50 };
-	  }
-
-	  if (is(bo, 'bpmn:Event')) {
-	    return { width: 36, height: 36 };
-	  }
-
-	  if (is(bo, 'bpmn:Participant')) {
-	    var isHorizontalPool = di.isHorizontal === undefined || di.isHorizontal === true;
-	    if (isExpanded(bo, di)) {
-	      if (isHorizontalPool) {
-	        return { width: 600, height: 250 };
-	      }
-	      return { width: 250, height: 600 };
-	    } else {
-	      if (isHorizontalPool) {
-	        return { width: 400, height: 60 };
-	      }
-	      return { width: 60, height: 400 };
-	    }
-	  }
-
-	  if (is(bo, 'bpmn:Lane')) {
-	    return { width: 400, height: 100 };
-	  }
-
-	  if (is(bo, 'bpmn:DataObjectReference')) {
-	    return { width: 36, height: 50 };
-	  }
-
-	  if (is(bo, 'bpmn:DataStoreReference')) {
-	    return { width: 50, height: 50 };
-	  }
-
-	  if (is(bo, 'bpmn:TextAnnotation')) {
-	    return { width: 100, height: 40 };
-	  }
-
-	  if (is(bo, 'bpmn:Group')) {
-	    return { width: 300, height: 300 };
-	  }
-
-	  return { width: 100, height: 80 };
+	  return getDefaultSize(element, di);
 	};
 
 
@@ -49578,8 +51986,8 @@
 	}
 
 	/**
-	 * @typedef {import('../../../core/Canvas').default} Canvas
-	 * @typedef {import('../Modeling').default} Modeling
+	 * @typedef {import('../../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../Modeling.js').default} Modeling
 	 */
 
 	/**
@@ -49637,13 +52045,13 @@
 	};
 
 	/**
-	 * @typedef {import('../../../model/Types').Element} Element
-	 * @typedef {import('../../../model/Types').Parent} Parent
-	 * @typedef {import('../../../model/Types').Shape} Shape
+	 * @typedef {import('../../../model/Types.js').Element} Element
+	 * @typedef {import('../../../model/Types.js').Parent} Parent
+	 * @typedef {import('../../../model/Types.js').Shape} Shape
 	 *
-	 * @typedef {import('../../../util/Types').Point} Point
+	 * @typedef {import('../../../util/Types.js').Point} Point
 	 *
-	 * @typedef {import('../Modeling').default} Modeling
+	 * @typedef {import('../Modeling.js').default} Modeling
 	 */
 
 	/**
@@ -49714,15 +52122,15 @@
 	}
 
 	/**
-	 * @typedef {import('../../../model/Types').Element} Element
-	 * @typedef {import('../../../model/Types').Shape} Shape
+	 * @typedef {import('../../../model/Types.js').Element} Element
+	 * @typedef {import('../../../model/Types.js').Shape} Shape
 	 *
-	 * @typedef {import('../../../util/Types').Point} Point
+	 * @typedef {import('../../../util/Types.js').Point} Point
 	 *
-	 * @typedef {import('../Modeling').ModelingHints} ModelingHints
+	 * @typedef {import('../Modeling.js').ModelingHints} ModelingHints
 	 *
-	 * @typedef {import('../../../core/Canvas').default} Canvas
-	 * @typedef {import('../../../layout/BaseLayouter').default} Layouter
+	 * @typedef {import('../../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../../layout/BaseLayouter.js').default} Layouter
 	 */
 
 	/**
@@ -49793,7 +52201,7 @@
 	};
 
 	/**
-	 * @typedef {import('../Modeling').default} Modeling
+	 * @typedef {import('../Modeling.js').default} Modeling
 	 */
 
 	var round$4 = Math.round;
@@ -49852,7 +52260,7 @@
 	    });
 	  });
 
-	  var parents = getParents$1(elements);
+	  var parentsSet = new Set(getParents$1(elements));
 
 	  var cache = {};
 
@@ -49880,7 +52288,7 @@
 
 	    var createShapeHints = assign$1({}, hints);
 
-	    if (parents.indexOf(element) === -1) {
+	    if (!parentsSet.has(element)) {
 	      createShapeHints.autoResize = false;
 	    }
 
@@ -49908,10 +52316,10 @@
 	};
 
 	/**
-	 * @typedef {import('../../../model/Types').Element} Element
-	 * @typedef {import('../../../util/Types').Point} Point
+	 * @typedef {import('../../../model/Types.js').Element} Element
+	 * @typedef {import('../../../util/Types.js').Point} Point
 	 *
-	 * @typedef {import('../../../core/Canvas').default} Canvas
+	 * @typedef {import('../../../core/Canvas.js').default} Canvas
 	 */
 
 	var round$3 = Math.round;
@@ -49987,12 +52395,12 @@
 	};
 
 	/**
-	 * @typedef {import('../../../core/Canvas').default} Canvas
+	 * @typedef {import('../../../core/Canvas.js').default} Canvas
 	 *
-	 * @typedef {import('../../../model/Types').Element} Element
-	 * @typedef {import('../../../model/Types').Parent} Parent
-	 * @typedef {import('../../../model/Types').Shape} Shape
-	 * @typedef {import('../../../util/Types').Point} Point
+	 * @typedef {import('../../../model/Types.js').Element} Element
+	 * @typedef {import('../../../model/Types.js').Parent} Parent
+	 * @typedef {import('../../../model/Types.js').Shape} Shape
+	 * @typedef {import('../../../util/Types.js').Point} Point
 	 */
 
 	/**
@@ -50004,7 +52412,7 @@
 	  CreateShapeHandler.call(this, canvas);
 	}
 
-	e$2(CreateLabelHandler, CreateShapeHandler);
+	e$3(CreateLabelHandler, CreateShapeHandler);
 
 	CreateLabelHandler.$inject = [ 'canvas' ];
 
@@ -50060,8 +52468,8 @@
 	}
 
 	/**
-	 * @typedef {import('../../../core/Canvas').default} Canvas
-	 * @typedef {import('../Modeling').default} Modeling
+	 * @typedef {import('../../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../Modeling.js').default} Modeling
 	 */
 
 	/**
@@ -50144,8 +52552,8 @@
 	};
 
 	/**
-	 * @typedef {import('../../../core/ElementRegistry').default} ElementRegistry
-	 * @typedef {import('../Modeling').default} Modeling
+	 * @typedef {import('../../../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../Modeling.js').default} Modeling
 	 */
 
 	/**
@@ -50186,8 +52594,8 @@
 	};
 
 	/**
-	 * @typedef {import('../../../core/Canvas').default} Canvas
-	 * @typedef {import('../Modeling').default} Modeling
+	 * @typedef {import('../../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../Modeling.js').default} Modeling
 	 */
 
 	/**
@@ -50277,7 +52685,7 @@
 	};
 
 	/**
-	 * @typedef {import('../Modeling').default} Modeling
+	 * @typedef {import('../Modeling.js').default} Modeling
 	 */
 
 	/**
@@ -50432,8 +52840,8 @@
 	};
 
 	/**
-	 * @typedef {import('../../../core/Canvas').default} Canvas
-	 * @typedef {import('../../../layout/BaseLayouter').default} Layouter
+	 * @typedef {import('../../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../../layout/BaseLayouter.js').default} Layouter
 	 */
 
 	/**
@@ -50547,9 +52955,9 @@
 	};
 
 	/**
-	 * @typedef {import('../../../../model/Types').Connection} Connection
-	 * @typedef {import('../../../../model/Types').Element} Element
-	 * @typedef {import('../../../../model/Types').Shape} Shape
+	 * @typedef {import('../../../../model/Types.js').Connection} Connection
+	 * @typedef {import('../../../../model/Types.js').Element} Element
+	 * @typedef {import('../../../../model/Types.js').Shape} Shape
 	 */
 
 	function MoveClosure() {
@@ -50606,12 +53014,12 @@
 	};
 
 	/**
-	 * @typedef {import('../../../../core/Types').ElementLike} Element
-	 * @typedef {import('../../../../core/Types').ShapeLike} Shape
+	 * @typedef {import('../../../../core/Types.js').ElementLike} Element
+	 * @typedef {import('../../../../core/Types.js').ShapeLike} Shape
 	 *
-	 * @typedef {import('../../../../util/Types').Point} Point
+	 * @typedef {import('../../../../util/Types.js').Point} Point
 	 *
-	 * @typedef {import('../../Modeling').default} Modeling
+	 * @typedef {import('../../Modeling.js').default} Modeling
 	 */
 
 	/**
@@ -50706,7 +53114,7 @@
 	};
 
 	/**
-	 * @typedef {import('../Modeling').default} Modeling
+	 * @typedef {import('../Modeling.js').default} Modeling
 	 */
 
 	/**
@@ -50744,7 +53152,7 @@
 	};
 
 	/**
-	 * @typedef {import('../Modeling').default} Modeling
+	 * @typedef {import('../Modeling.js').default} Modeling
 	 */
 
 	/**
@@ -50849,7 +53257,7 @@
 	};
 
 	/**
-	 * @typedef {import('../Modeling').default} Modeling
+	 * @typedef {import('../Modeling.js').default} Modeling
 	 */
 
 	/**
@@ -50959,10 +53367,10 @@
 	}
 
 	/**
-	 * @typedef {import('../../model/Types').Shape} Shape
+	 * @typedef {import('../../../model/Types.js').Shape} Shape
 	 *
-	 * @typedef {import('../Modeling').default} Modeling
-	 * @typedef {import('../../rules/Rules').default} Rules
+	 * @typedef {import('../Modeling.js').default} Modeling
+	 * @typedef {import('../../rules/Rules.js').default} Rules
 	 */
 
 	/**
@@ -51106,7 +53514,7 @@
 	};
 
 	/**
-	 * @typedef {import('../Modeling').default} Modeling
+	 * @typedef {import('../Modeling.js').default} Modeling
 	 */
 
 	/**
@@ -51211,7 +53619,7 @@
 	};
 
 	/**
-	 * @typedef {import('../Modeling').default} Modeling
+	 * @typedef {import('../Modeling.js').default} Modeling
 	 */
 
 	/**
@@ -51300,7 +53708,8 @@
 	    oldBounds
 	) {
 	  var self = this,
-	      affectedShapes = movingShapes.concat(resizingShapes);
+	      movingShapesSet = new Set(movingShapes),
+	      resizingShapesSet = new Set(resizingShapes);
 
 	  forEach(connections, function(connection) {
 	    var source = connection.source,
@@ -51309,7 +53718,10 @@
 	        axis = getAxisFromDirection(direction),
 	        layoutHints = {};
 
-	    if (includes$1(affectedShapes, source) && includes$1(affectedShapes, target)) {
+	    var sourceAffected = movingShapesSet.has(source) || resizingShapesSet.has(source),
+	        targetAffected = movingShapesSet.has(target) || resizingShapesSet.has(target);
+
+	    if (sourceAffected && targetAffected) {
 
 	      // move waypoints
 	      waypoints = map(waypoints, function(waypoint) {
@@ -51331,18 +53743,18 @@
 	      self._modeling.updateWaypoints(connection, waypoints, {
 	        labelBehavior: false
 	      });
-	    } else if (includes$1(affectedShapes, source) || includes$1(affectedShapes, target)) {
+	    } else if (sourceAffected || targetAffected) {
 
 	      // re-layout connection with moved start/end
-	      if (includes$1(movingShapes, source)) {
+	      if (movingShapesSet.has(source)) {
 	        layoutHints.connectionStart = getMovedSourceAnchor(connection, source, delta);
-	      } else if (includes$1(movingShapes, target)) {
+	      } else if (movingShapesSet.has(target)) {
 	        layoutHints.connectionEnd = getMovedTargetAnchor(connection, target, delta);
-	      } else if (includes$1(resizingShapes, source)) {
+	      } else if (resizingShapesSet.has(source)) {
 	        layoutHints.connectionStart = getResizedSourceAnchor(
 	          connection, source, oldBounds[source.id]
 	        );
-	      } else if (includes$1(resizingShapes, target)) {
+	      } else if (resizingShapesSet.has(target)) {
 	        layoutHints.connectionEnd = getResizedTargetAnchor(
 	          connection, target, oldBounds[target.id]
 	        );
@@ -51396,10 +53808,6 @@
 	  }
 	}
 
-	function includes$1(array, item) {
-	  return array.indexOf(item) !== -1;
-	}
-
 	function getBounds(shape) {
 	  return {
 	    x: shape.x,
@@ -51410,9 +53818,9 @@
 	}
 
 	/**
-	 * @typedef {import('../../model/Types').Shape} Shape
+	 * @typedef {import('../../../model/Types.js').Shape} Shape
 	 *
-	 * @typedef {import('../Modeling').default} Modeling
+	 * @typedef {import('../Modeling.js').default} Modeling
 	 */
 
 	/**
@@ -51519,7 +53927,7 @@
 	}
 
 	/**
-	 * @typedef {import('../Modeling').default} Modeling
+	 * @typedef {import('../Modeling.js').default} Modeling
 	 */
 
 	/**
@@ -51617,22 +54025,22 @@
 	};
 
 	/**
-	 * @typedef {import('../../model/Types').Element} Element
-	 * @typedef {import('../../model/Types').Connection} Connection
-	 * @typedef {import('../../model/Types').Parent} Parent
-	 * @typedef {import('../../model/Types').Shape} Shape
-	 * @typedef {import('../../model/Types').Label} Label
+	 * @typedef {import('../../model/Types.js').Element} Element
+	 * @typedef {import('../../model/Types.js').Connection} Connection
+	 * @typedef {import('../../model/Types.js').Parent} Parent
+	 * @typedef {import('../../model/Types.js').Shape} Shape
+	 * @typedef {import('../../model/Types.js').Label} Label
 	 *
-	 * @typedef {import('../../command/CommandStack').default} CommandStack
-	 * @typedef {import('../../core/ElementFactory').default} ElementFactory
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../command/CommandStack.js').default} CommandStack
+	 * @typedef {import('../../core/ElementFactory.js').default} ElementFactory
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 *
-	 * @typedef {import('../../command/CommandStack').CommandHandlerConstructor} CommandHandlerConstructor
+	 * @typedef {import('../../command/CommandStack.js').CommandHandlerConstructor} CommandHandlerConstructor
 	 *
-	 * @typedef {import('../../util/Types').Dimensions} Dimensions
-	 * @typedef {import('../../util/Types').Direction} Direction
-	 * @typedef {import('../../util/Types').Point} Point
-	 * @typedef {import('../../util/Types').Rect} Rect
+	 * @typedef {import('../../util/Types.js').Dimensions} Dimensions
+	 * @typedef {import('../../util/Types.js').Direction} Direction
+	 * @typedef {import('../../util/Types.js').Point} Point
+	 * @typedef {import('../../util/Types.js').Rect} Rect
 	 *
 	 * @typedef { 'x' | 'y' } ModelingDistributeAxis
 	 *
@@ -51886,7 +54294,6 @@
 	 *
 	 * @return {T}
 	 */
-
 	/**
 	 * Create a connection.
 	 *
@@ -53161,8 +55568,6 @@
 	/**
 	 * @typedef {import('diagram-js/lib/command/CommandHandler').default} CommandHandler
 	 *
-	 * @typedef {import('diagram-js/lib/core/ElementRegistry').default} ElementRegistry
-	 *
 	 * @typedef {import('../../../model/Types').Shape} Shape
 	 */
 
@@ -53175,15 +55580,9 @@
 	 *
 	 * @implements {CommandHandler}
 	 *
-	 * @param {ElementRegistry} elementRegistry
 	 */
-	function UpdateFlowNodeRefsHandler(elementRegistry) {
-	  this._elementRegistry = elementRegistry;
-	}
+	function UpdateFlowNodeRefsHandler() {}
 
-	UpdateFlowNodeRefsHandler.$inject = [
-	  'elementRegistry'
-	];
 
 	/**
 	 * @param {Shape} flowNodeShapes
@@ -53358,6 +55757,409 @@
 
 	  return [];
 	};
+
+	/**
+	 * @typedef {import('diagram-js/lib/command/CommandHandler').default} CommandHandler
+	 * @typedef {import('diagram-js/lib/core/ElementRegistry').default} ElementRegistry
+	 * @typedef {import('../BpmnFactory').default} BpmnFactory
+	 *
+	 * @typedef {import('../../../model/Types').Element} Element
+	 * @typedef {import('../../../model/Types').ModdleElement} ModdleElement
+	 *
+	 * @typedef { {
+	 *   categoryValue: ModdleElement;
+	 *   root?: Element;
+	 * } } CategoryGroupEntry
+	 */
+
+	var CATEGORY_VALUE_REFS_ATTR = 'categoryValueRef';
+
+
+	/**
+	 * Updates category value references for flow elements visually enclosed by groups.
+	 *
+	 * A flow element is grouped only when it shares the group's diagram root and
+	 * is geometrically enclosed by the group. Consequently, visible children of an
+	 * expanded subprocess are grouped, while children of a collapsed subprocess
+	 * are not.
+	 *
+	 * Groups without a category value are auto-healed: if such a group visually
+	 * encloses an affected flow element a category value is created for it on the
+	 * fly, so that legacy diagrams (groups modeled without a category value) start
+	 * to categorize their contents as soon as they are interacted with.
+	 *
+	 * @implements {CommandHandler}
+	 *
+	 * @param {BpmnFactory} bpmnFactory
+	 * @param {ElementRegistry} elementRegistry
+	 */
+	function UpdateCategoryValueRefsHandler(bpmnFactory, elementRegistry) {
+	  this._bpmnFactory = bpmnFactory;
+	  this._elementRegistry = elementRegistry;
+	}
+
+	UpdateCategoryValueRefsHandler.$inject = [
+	  'bpmnFactory',
+	  'elementRegistry'
+	];
+
+
+	/**
+	 * @param { Element[] } affectedFlowElements
+	 * @param { {
+	 *   categoryValue: ModdleElement;
+	 *   groupShape: Element;
+	 * }[] } affectedGroupEntries
+	 *
+	 * @return { {
+	 *   flowElements: {
+	 *     businessObject: ModdleElement;
+	 *     categoryValuesToAdd: ModdleElement[];
+	 *     categoryValuesToRemove: ModdleElement[];
+	 *   }[];
+	 *   groups: {
+	 *     groupShape: Element;
+	 *     categoryValue: ModdleElement;
+	 *     category: ModdleElement;
+	 *   }[];
+	 * } }
+	 */
+	UpdateCategoryValueRefsHandler.prototype._computeUpdates = function(affectedFlowElements, affectedGroupEntries) {
+	  var elementRegistry = this._elementRegistry,
+	      bpmnFactory = this._bpmnFactory;
+
+	  /** @type {Map<Element, ModdleElement>} */
+	  var flowElementBusinessObjects = new Map();
+
+	  var groupUpdates = [];
+
+	  /**
+	   * @type {Map<Element, {
+	   *   present?: CategoryGroupEntry;
+	   *   past?: CategoryGroupEntry;
+	   * }>}
+	   */
+	  var categoryGroups = new Map();
+
+	  /**
+	   * Adds a group to the list of groups to consider for category value updates.
+	   *
+	   * @param {Element} groupShape
+	   * @param {ModdleElement} categoryValue
+	   * @param {boolean} isPresent
+	   */
+	  function addGroup(groupShape, categoryValue, isPresent) {
+	    if (!categoryValue) {
+	      return;
+	    }
+
+	    var categoryGroup = categoryGroups.get(groupShape);
+
+	    if (!categoryGroup) {
+	      categoryGroup = {};
+	      categoryGroups.set(groupShape, categoryGroup);
+	    }
+
+	    if (isPresent && categoryGroup.present) {
+	      return;
+	    }
+
+	    if (!isPresent && categoryGroup.past) {
+	      return;
+	    }
+
+	    if (isPresent) {
+	      categoryGroup.present = {
+	        categoryValue: categoryValue,
+	        root: getRoot(groupShape)
+	      };
+	    } else {
+	      categoryGroup.past = {
+	        categoryValue: categoryValue
+	      };
+	    }
+	  }
+
+	  /**
+	   * Adds a flow element to the list of flow elements to consider for category
+	   * value updates.
+	   *
+	   * @param {Element} flowElement
+	   */
+	  function addFlowElement(flowElement) {
+	    flowElementBusinessObjects.set(
+	      flowElement,
+	      getBusinessObject(flowElement)
+	    );
+	  }
+
+	  /**
+	   * Adds all flow elements on the diagram to the list of flow elements to
+	   * consider; skips root elements (e.g. sub process planes) which share a
+	   * business object with their collapsed shape but carry no diagram position.
+	   */
+	  function addAllFlowElements() {
+	    elementRegistry.filter(function(element) {
+	      return is(element, 'bpmn:FlowElement') && !isLabel(element) && element.parent;
+	    }).forEach(addFlowElement);
+	  }
+
+	  /**
+	   * Returns a group's category value, creating one on the fly for
+	   * legacy groups modeled without one. Retrieving the value in order to
+	   * reference it materializes it; the fresh value is recorded as a heal so
+	   * CategoryRootElementReferenceBehavior can maintain its root element.
+	   *
+	   * @param {Element} groupShape
+	   *
+	   * @return {ModdleElement}
+	   */
+	  function getCategoryValue(groupShape) {
+	    var groupBo = getBusinessObject(groupShape),
+	        categoryValue = groupBo.get('categoryValueRef');
+
+	    if (!categoryValue) {
+	      categoryValue = getOrCreateCategoryValueForGroup(bpmnFactory, groupBo);
+
+	      groupUpdates.push(createGroupUpdate(groupShape, categoryValue));
+	    }
+
+	    return categoryValue;
+	  }
+
+	  function getElementsByRoot(elements) {
+	    return elements.reduce(function(elementsByRoot, element) {
+	      var root = getRoot(element),
+	          elementsInRoot = elementsByRoot.get(root);
+
+	      if (!elementsInRoot) {
+	        elementsInRoot = [];
+	        elementsByRoot.set(root, elementsInRoot);
+	      }
+
+	      elementsInRoot.push(element);
+
+	      return elementsByRoot;
+	    }, new Map());
+	  }
+
+	  affectedFlowElements = Array.from(affectedFlowElements || []);
+
+	  var affectedFlowElementsByRoot = getElementsByRoot(affectedFlowElements);
+
+	  // when a group is moved, resized, added or removed, the category value
+	  // references of all flow elements must be rechecked
+	  if (affectedGroupEntries.length) {
+	    addAllFlowElements();
+	  }
+
+	  // flow elements that were genuinely moved or created; unrelated groups
+	  // will not be touched
+	  affectedFlowElements.forEach(addFlowElement);
+
+	  // add all present groups to the list of groups to consider for category
+	  // value updates, auto-healing legacy groups only when an affected flow
+	  // element moves into them
+	  elementRegistry.filter(function(element) {
+	    return is(element, 'bpmn:Group') && !isLabel(element) && element.parent;
+	  }).forEach(function(groupShape) {
+	    var categoryValue = getBusinessObject(groupShape).get('categoryValueRef');
+
+	    if (!categoryValue) {
+	      var groupRoot = getRoot(groupShape),
+	          affectedFlowElementsInRoot = affectedFlowElementsByRoot.get(groupRoot) || [],
+	          enclosedAffectedFlowElements = getEnclosedElements(
+	            affectedFlowElementsInRoot,
+	            groupShape
+	          ),
+	          enclosesAffectedFlowElement = Object.keys(enclosedAffectedFlowElements).length > 0;
+
+	      if (enclosesAffectedFlowElement) {
+	        categoryValue = getCategoryValue(groupShape);
+	      }
+	    }
+
+	    addGroup(groupShape, categoryValue, true);
+	  });
+
+	  affectedGroupEntries.forEach(function(groupEntry) {
+	    addGroup(groupEntry.groupShape, groupEntry.categoryValue, false);
+	  });
+
+	  // a healed group receives a fresh category value; recheck all flow elements
+	  // so that everything it visually encloses is tagged consistently, not just
+	  // the flow element that triggered the healing
+	  if (groupUpdates.length) {
+	    addAllFlowElements();
+	  }
+
+	  var flowElements = Array.from(flowElementBusinessObjects.keys());
+
+	  var managedCategoryValues = Array.from(categoryGroups.values()).reduce(function(set, group) {
+	    if (group.present) {
+	      set.add(group.present.categoryValue);
+	    }
+
+	    if (group.past) {
+	      set.add(group.past.categoryValue);
+	    }
+
+	    return set;
+	  }, new Set());
+
+	  var categoryValuesByFlowElement = new Map(),
+	      flowElementsByRoot = getElementsByRoot(flowElements);
+
+	  // Containment is calculated once per group and diagram root. This avoids
+	  // allocating an enclosure result for every flow element / group pair.
+	  categoryGroups.forEach(function(categoryGroup, groupShape) {
+	    var presentGroup = categoryGroup.present;
+
+	    if (!presentGroup) {
+	      return;
+	    }
+
+	    var flowElementsInRoot = flowElementsByRoot.get(presentGroup.root) || [],
+	        enclosedFlowElements = getEnclosedElements(flowElementsInRoot, groupShape);
+
+	    flowElementsInRoot.forEach(function(flowElement) {
+	      if (!enclosedFlowElements[flowElement.id]) {
+	        return;
+	      }
+
+	      var categoryValues = categoryValuesByFlowElement.get(flowElement);
+
+	      if (!categoryValues) {
+	        categoryValues = new Set();
+	        categoryValuesByFlowElement.set(flowElement, categoryValues);
+	      }
+
+	      categoryValues.add(presentGroup.categoryValue);
+	    });
+	  });
+
+	  // compute updates for all flow elements based on the groups they are inside
+	  var flowElementUpdates = flowElements.reduce(function(flowElementUpdates, flowElement) {
+	    var flowElementBo = flowElementBusinessObjects.get(flowElement),
+	        categoryValueRefs = flowElementBo.get(CATEGORY_VALUE_REFS_ATTR),
+	        categoryValueRefSet = new Set(categoryValueRefs),
+	        enclosingCategoryValues = categoryValuesByFlowElement.get(flowElement) || new Set(),
+	        categoryValuesToAdd = Array.from(enclosingCategoryValues).filter(function(categoryValue) {
+	          return !categoryValueRefSet.has(categoryValue);
+	        }),
+	        categoryValuesToRemove = categoryValueRefs.filter(function(categoryValue) {
+	          return managedCategoryValues.has(categoryValue) &&
+	            !enclosingCategoryValues.has(categoryValue);
+	        });
+
+	    if (categoryValuesToAdd.length || categoryValuesToRemove.length) {
+	      flowElementUpdates.push({
+	        businessObject: flowElementBo,
+	        categoryValuesToAdd,
+	        categoryValuesToRemove
+	      });
+	    }
+
+	    return flowElementUpdates;
+	  }, []);
+
+	  return {
+	    flowElements: flowElementUpdates,
+	    groups: groupUpdates
+	  };
+	};
+
+
+	UpdateCategoryValueRefsHandler.prototype.execute = function(context) {
+	  var updates = context.updates;
+
+	  if (!updates) {
+	    updates = context.updates = this._computeUpdates(
+	      context.affectedFlowElements,
+	      context.affectedGroupEntries
+	    );
+	  }
+
+	  // set auto-healed category values first so that flow element updates can
+	  // reference them; root element linking is handled by
+	  // CategoryRootElementReferenceBehavior
+	  applyGroupUpdates(updates.groups);
+
+	  applyFlowElementUpdates(updates.flowElements);
+
+	  return [];
+	};
+
+
+	UpdateCategoryValueRefsHandler.prototype.revert = function(context) {
+	  var updates = context.updates;
+
+	  revertFlowElementUpdates(updates.flowElements);
+
+	  revertGroupUpdates(updates.groups);
+
+	  return [];
+	};
+
+
+	function createGroupUpdate(groupShape, categoryValue) {
+	  return {
+	    groupShape: groupShape,
+	    categoryValue: categoryValue,
+	    category: categoryValue.$parent
+	  };
+	}
+
+	function applyGroupUpdates(groupUpdates) {
+	  groupUpdates.forEach(function(groupUpdate) {
+	    getBusinessObject(groupUpdate.groupShape).categoryValueRef = groupUpdate.categoryValue;
+	    groupUpdate.categoryValue.$parent = groupUpdate.category;
+	  });
+	}
+
+	function revertGroupUpdates(groupUpdates) {
+	  groupUpdates.forEach(function(groupUpdate) {
+	    getBusinessObject(groupUpdate.groupShape).categoryValueRef = null;
+	  });
+	}
+
+	function applyFlowElementUpdates(flowElementUpdates) {
+	  flowElementUpdates.forEach(function(flowElementUpdate) {
+	    var businessObject = flowElementUpdate.businessObject,
+	        categoryValueRefs = businessObject.get(CATEGORY_VALUE_REFS_ATTR);
+
+	    flowElementUpdate.categoryValuesToRemove.forEach(function(categoryValue) {
+	      remove(categoryValueRefs, categoryValue);
+	    });
+
+	    flowElementUpdate.categoryValuesToAdd.forEach(function(categoryValue) {
+	      add(categoryValueRefs, categoryValue, true);
+	    });
+	  });
+	}
+
+	function revertFlowElementUpdates(flowElementUpdates) {
+	  flowElementUpdates.forEach(function(flowElementUpdate) {
+	    var businessObject = flowElementUpdate.businessObject,
+	        categoryValueRefs = businessObject.get(CATEGORY_VALUE_REFS_ATTR);
+
+	    flowElementUpdate.categoryValuesToAdd.forEach(function(categoryValue) {
+	      remove(categoryValueRefs, categoryValue);
+	    });
+
+	    flowElementUpdate.categoryValuesToRemove.forEach(function(categoryValue) {
+	      add(categoryValueRefs, categoryValue, true);
+	    });
+	  });
+	}
+
+	function getRoot(element) {
+	  while (element.parent) {
+	    element = element.parent;
+	  }
+
+	  return element;
+	}
 
 	/**
 	 * @typedef {import('diagram-js/lib/command/CommandHandler').default} CommandHandler
@@ -53719,6 +56521,11 @@
 	 * @typedef { {
 	 *   removeShape?: boolean;
 	 * } } UpdateLabelHints
+	 *
+	 * @typedef { {
+	 *   categoryValue?: ModdleElement;
+	 *   groupShape: Shape;
+	 * } } GroupEntry
 	 */
 
 	/**
@@ -53749,7 +56556,7 @@
 	  this._bpmnRules = bpmnRules;
 	}
 
-	e$2(Modeling, Modeling$1);
+	e$3(Modeling, Modeling$1);
 
 	Modeling.$inject = [
 	  'eventBus',
@@ -53769,6 +56576,7 @@
 	  handlers['lane.resize'] = ResizeLaneHandler;
 	  handlers['lane.split'] = SplitLaneHandler;
 	  handlers['lane.updateRefs'] = UpdateFlowNodeRefsHandler;
+	  handlers['group.updateRefs'] = UpdateCategoryValueRefsHandler;
 	  handlers['id.updateClaim'] = IdClaimHandler;
 	  handlers['element.setColor'] = SetColorHandler;
 	  handlers['element.updateLabel'] = UpdateLabelHandler;
@@ -53947,6 +56755,20 @@
 	};
 
 	/**
+	 * Update the referenced category values of each flow element.
+	 *
+	 * @param {Element[]} affectedFlowElements The flow elements to update.
+	 * @param {GroupEntry[]} affectedGroupEntries The groups to update.
+	 */
+	Modeling.prototype.updateCategoryValueRefs = function(affectedFlowElements, affectedGroupEntries) {
+
+	  this._commandStack.execute('group.updateRefs', {
+	    affectedFlowElements: affectedFlowElements,
+	    affectedGroupEntries: affectedGroupEntries
+	  });
+	};
+
+	/**
 	 * Claim an ID.
 	 *
 	 * @param {string} id The ID to claim.
@@ -53991,10 +56813,10 @@
 	};
 
 	/**
-	 * @typedef {import('../core/Types').ElementLike} Element
-	 * @typedef {import('../core/Types').ConnectionLike} Connection
+	 * @typedef {import('../core/Types.js').ElementLike} Element
+	 * @typedef {import('../core/Types.js').ConnectionLike} Connection
 	 *
-	 * @typedef {import('../util').Point} Point
+	 * @typedef {import('../util/Types.js').Point} Point
 	 *
 	 * @typedef { {
 	 *   connectionStart?: Point;
@@ -54036,8 +56858,8 @@
 	};
 
 	/**
-	 * @typedef {import('../util/Types').Point} Point
-	 * @typedef {import('../util/Types').Rect} Rect
+	 * @typedef {import('../util/Types.js').Point} Point
+	 * @typedef {import('../util/Types.js').Rect} Rect
 	 */
 
 	var MIN_SEGMENT_LENGTH = 20,
@@ -54859,7 +57681,7 @@
 	  this._elementRegistry = elementRegistry;
 	}
 
-	e$2(BpmnLayouter, BaseLayouter);
+	e$3(BpmnLayouter, BaseLayouter);
 
 	/**
 	 * Returns waypoints of laid out connection.
@@ -55251,8 +58073,8 @@
 	BpmnLayouter.$inject = [ 'elementRegistry' ];
 
 	/**
-	 * @typedef {import('../core/ElementRegistry').default} ElementRegistry
-	 * @typedef {import('../core/GraphicsFactory').default} GraphicsFactory
+	 * @typedef {import('../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../core/GraphicsFactory.js').default} GraphicsFactory
 	 */
 
 	function dockingToPoint(docking) {
@@ -55485,6 +58307,67 @@
 	  appendPreview: [ 'type', AppendPreview ]
 	};
 
+	/**
+	 * @typedef { {
+	 *   x: number;
+	 *   y: number;
+	 *   width?: number;
+	 *   height?: number;
+	 *   maxWidth?: number;
+	 *   maxHeight?: number;
+	 *   minWidth?: number;
+	 *   minHeight?: number;
+	 * } } TextBoxBounds
+	 *
+	 * @typedef { {
+	 *   width?: string | number;
+	 *   height?: string | number;
+	 *   maxWidth?: string | number;
+	 *   maxHeight?: string | number;
+	 *   minWidth?: string | number;
+	 *   minHeight?: string | number;
+	 *   left?: string | number;
+	 *   top?: string | number;
+	 *   backgroundColor?: string | null;
+	 *   position?: string;
+	 *   overflow?: string;
+	 *   border?: string | null;
+	 *   wordWrap?: string;
+	 *   textAlign?: string;
+	 *   outline?: string;
+	 *   transform?: string | null;
+	 *   fontFamily?: string;
+	 *   fontSize?: string | number;
+	 *   fontWeight?: string | number;
+	 *   lineHeight?: string | number;
+	 *   padding?: string | number;
+	 *   paddingTop?: string | number;
+	 *   paddingRight?: string | number;
+	 *   paddingBottom?: string | number;
+	 *   paddingLeft?: string | number;
+	 * } } TextBoxStyle
+	 *
+	 * @typedef { {
+	 *   autoResize?: boolean;
+	 *   resizable?: boolean;
+	 *   centerVertically?: boolean;
+	 * } } TextBoxOptions
+	 *
+	 * @typedef { {
+	 *   width: number;
+	 *   height: number;
+	 *   dx: number;
+	 *   dy: number;
+	 * } } TextBoxResizeEvent
+	 *
+	 * @typedef { {
+	 *   container: HTMLElement;
+	 *   keyHandler?: (event: KeyboardEvent) => void;
+	 *   resizeHandler?: (event: TextBoxResizeEvent) => void;
+	 *   focusoutHandler?: (event: FocusEvent) => void;
+	 * } } TextBoxConfig
+	 */
+
 	var min = Math.min,
 	    max = Math.max;
 
@@ -55514,10 +58397,7 @@
 	 *     content
 	 *     resize-handle
 	 *
-	 * @param {object} options
-	 * @param {DOMElement} options.container The DOM element to append the contentContainer to
-	 * @param {Function} options.keyHandler Handler for key events
-	 * @param {Function} options.resizeHandler Handler for resize events
+	 * @param {TextBoxConfig} options
 	 */
 	function TextBox(options) {
 	  this.container = options.container;
@@ -55528,10 +58408,14 @@
 	    '</div>'
 	  );
 
-	  this.content = query('[contenteditable]', this.parent);
+	  /**
+	   * @type {HTMLElement}
+	   */
+	  this.content = /** @type {HTMLElement} */ (query('[contenteditable]', this.parent));
 
 	  this.keyHandler = options.keyHandler || function() {};
 	  this.resizeHandler = options.resizeHandler || function() {};
+	  this.focusoutHandler = options.focusoutHandler || function() {};
 
 	  this.autoResize = bind$1(this.autoResize, this);
 	  this.handlePaste = bind$1(this.handlePaste, this);
@@ -55541,19 +58425,12 @@
 	/**
 	 * Create a text box with the given position, size, style and text content
 	 *
-	 * @param {Object} bounds
-	 * @param {Number} bounds.x absolute x position
-	 * @param {Number} bounds.y absolute y position
-	 * @param {Number} [bounds.width] fixed width value
-	 * @param {Number} [bounds.height] fixed height value
-	 * @param {Number} [bounds.maxWidth] maximum width value
-	 * @param {Number} [bounds.maxHeight] maximum height value
-	 * @param {Number} [bounds.minWidth] minimum width value
-	 * @param {Number} [bounds.minHeight] minimum height value
-	 * @param {Object} [style]
-	 * @param {String} value text content
+	 * @param {TextBoxBounds} bounds
+	 * @param {TextBoxStyle|undefined} style
+	 * @param {string} value text content
+	 * @param {TextBoxOptions} [options]
 	 *
-	 * @return {DOMElement} The created content DOM element
+	 * @return {HTMLElement} The created parent DOM element
 	 */
 	TextBox.prototype.create = function(bounds, style, value, options) {
 	  var self = this;
@@ -55636,6 +58513,7 @@
 	  event.bind(content, 'keydown', this.keyHandler);
 	  event.bind(content, 'mousedown', stopPropagation);
 	  event.bind(content, 'paste', self.handlePaste);
+	  event.bind(content, 'focusout', this.focusoutHandler);
 
 	  if (options.autoResize) {
 	    event.bind(content, 'input', this.autoResize);
@@ -55655,6 +58533,8 @@
 
 	/**
 	 * Intercept paste events to remove formatting from pasted text.
+	 *
+	 * @param {ClipboardEvent} e
 	 */
 	TextBox.prototype.handlePaste = function(e) {
 	  var options = this.options,
@@ -55685,6 +58565,9 @@
 	  }
 	};
 
+	/**
+	 * @param {string} text
+	 */
 	TextBox.prototype.insertText = function(text) {
 	  text = normalizeEndOfLineSequences(text);
 
@@ -55888,6 +58771,7 @@
 	  event.unbind(content, 'mousedown', stopPropagation);
 	  event.unbind(content, 'input', this.autoResize);
 	  event.unbind(content, 'paste', this.handlePaste);
+	  event.unbind(content, 'focusout', this.focusoutHandler);
 
 	  if (resizeHandle) {
 	    resizeHandle.removeAttribute('style');
@@ -55899,11 +58783,17 @@
 	};
 
 
+	/**
+	 * @return {string}
+	 */
 	TextBox.prototype.getValue = function() {
 	  return this.content.innerText.trim();
 	};
 
 
+	/**
+	 * @return {Range}
+	 */
 	TextBox.prototype.getSelection = function() {
 	  var selection = window.getSelection(),
 	      range = selection.getRangeAt(0);
@@ -55912,6 +58802,10 @@
 	};
 
 
+	/**
+	 * @param {Node|null} container
+	 * @param {number} [offset]
+	 */
 	TextBox.prototype.setSelection = function(container, offset) {
 	  var range = document.createRange();
 
@@ -55935,36 +58829,95 @@
 	}
 
 	/**
+	 * @typedef {import('diagram-js/lib/core/Canvas.js').default} Canvas
+	 * @typedef {import('diagram-js/lib/core/EventBus.js').default} EventBus
+	 *
+	 * @typedef {import('diagram-js/lib/model/Types.js').Element} Element
+	 *
+	 * @typedef {import('diagram-js/lib/util/Types.js').Rect} Rect
+	 *
+	 * @typedef {import('./TextBox.js').TextBoxBounds} TextBoxBounds
+	 * @typedef {import('./TextBox.js').TextBoxStyle} TextBoxStyle
+	 * @typedef {import('./TextBox.js').TextBoxOptions} TextBoxOptions
+	 * @typedef {import('./TextBox.js').TextBoxResizeEvent} TextBoxResizeEvent
+	 */
+
+	/**
+	 * The context returned by a {@link DirectEditingProvider} to activate
+	 * direct editing for an element.
+	 *
+	 * @typedef { {
+	 *   bounds: TextBoxBounds;
+	 *   text: string;
+	 *   style?: TextBoxStyle;
+	 *   options?: TextBoxOptions;
+	 * } } DirectEditingContext
+	 */
+
+	/**
+	 * A provider that enables direct editing for elements.
+	 *
+	 * @typedef { {
+	 *   activate: (element: Element) => DirectEditingContext | null | undefined;
+	 *   update: (element: Element, newText: string, previousText: string, bounds: Rect) => void;
+	 * } } DirectEditingProvider
+	 */
+
+	/**
+	 * @typedef { {
+	 *   element: Element;
+	 *   context: DirectEditingContext;
+	 *   provider: DirectEditingProvider;
+	 * } } DirectEditingActive
+	 */
+
+	/**
 	 * A direct editing component that allows users
 	 * to edit an elements text directly in the diagram
 	 *
-	 * @param {EventBus} eventBus the event bus
-	 * @param {Canvas} canvas the canvas
+	 * @param {EventBus} eventBus
+	 * @param {Canvas} canvas
 	 */
 	function DirectEditing(eventBus, canvas) {
 
 	  this._eventBus = eventBus;
 	  this._canvas = canvas;
 
+	  /**
+	   * @type {DirectEditingProvider[]}
+	   */
 	  this._providers = [];
+
+	  /**
+	   * @type {DirectEditingActive | null}
+	   */
+	  this._active = null;
+
 	  this._textbox = new TextBox({
 	    container: canvas.getContainer(),
 	    keyHandler: bind$1(this._handleKey, this),
-	    resizeHandler: bind$1(this._handleResize, this)
+	    resizeHandler: bind$1(this._handleResize, this),
+	    focusoutHandler: bind$1(this._handleFocusout, this)
 	  });
+
+	  eventBus.on([ 'diagram.clear', 'diagram.destroy' ], () => this._cleanup());
 	}
 
 	DirectEditing.$inject = [ 'eventBus', 'canvas' ];
 
 
 	/**
-	 * Register a direct editing provider
-
-	 * @param {Object} provider the provider, must expose an #activate(element) method that returns
-	 *                          an activation context ({ bounds: {x, y, width, height }, text }) if
-	 *                          direct editing is available for the given element.
-	 *                          Additionally the provider must expose a #update(element, value) method
-	 *                          to receive direct editing updates.
+	 * Register a direct editing provider.
+	 *
+	 * A provider must expose an `#activate(element)` method that returns
+	 * an activation context (`{ bounds: { x, y, width, height }, text }`) if
+	 * direct editing is available for the given element.
+	 *
+	 * Additionally the provider must expose an
+	 * `#update(element, newText, previousText, bounds)` method to receive
+	 * direct editing updates.
+	 *
+	 * @param {DirectEditingProvider} provider
 	 */
 	DirectEditing.prototype.registerProvider = function(provider) {
 	  this._providers.push(provider);
@@ -55974,7 +58927,7 @@
 	/**
 	 * Returns true if direct editing is currently active
 	 *
-	 * @param {djs.model.Base} [element]
+	 * @param {Element} [element]
 	 *
 	 * @return {boolean}
 	 */
@@ -55996,24 +58949,42 @@
 	};
 
 
+	/**
+	 * @param {string} event
+	 * @param {Object} [context]
+	 */
 	DirectEditing.prototype._fire = function(event, context) {
 	  this._eventBus.fire('directEditing.' + event, context || { active: this._active });
 	};
 
+	/**
+	 * Close direct editing, if it is currently active.
+	 */
 	DirectEditing.prototype.close = function() {
-	  this._textbox.destroy();
-
 	  this._fire('deactivate');
 
-	  this._active = null;
-
-	  this.resizable = undefined;
+	  this._cleanup();
 
 	  // restoreFocus API is available from diagram-js@15.0.0
 	  this._canvas.restoreFocus && this._canvas.restoreFocus();
 	};
 
+	DirectEditing.prototype._cleanup = function() {
+	  if (!this._active) {
+	    return;
+	  }
 
+	  this._textbox.destroy();
+
+	  this._active = null;
+
+	  this.resizable = undefined;
+	};
+
+	/**
+	 * Complete direct editing, updating the element via the
+	 * active provider if the text or bounds changed.
+	 */
 	DirectEditing.prototype.complete = function() {
 
 	  var active = this._active;
@@ -56049,11 +59020,19 @@
 	};
 
 
+	/**
+	 * Returns the current text value.
+	 *
+	 * @return {string}
+	 */
 	DirectEditing.prototype.getValue = function() {
 	  return this._textbox.getValue();
 	};
 
 
+	/**
+	 * @param {KeyboardEvent} e
+	 */
 	DirectEditing.prototype._handleKey = function(e) {
 
 	  // stop bubble
@@ -56075,20 +59054,42 @@
 	};
 
 
+	/**
+	 * @param {TextBoxResizeEvent} event
+	 */
 	DirectEditing.prototype._handleResize = function(event) {
 	  this._fire('resize', event);
 	};
 
 
 	/**
+	 * @param {FocusEvent} event
+	 */
+	DirectEditing.prototype._handleFocusout = function(event) {
+
+	  // ignore focus moves within the textbox (e.g. to the resize handle)
+	  if (event.relatedTarget && this._textbox.parent.contains(event.relatedTarget)) {
+	    return;
+	  }
+
+	  this.complete();
+	};
+
+
+	/**
 	 * Activate direct editing on the given element
 	 *
-	 * @param {Object} ElementDescriptor the descriptor for a shape or connection
-	 * @return {Boolean} true if the activation was possible
+	 * @param {Element} element
+	 *
+	 * @return {boolean} true if the activation was possible
 	 */
 	DirectEditing.prototype.activate = function(element) {
 	  if (this.isActive()) {
 	    this.cancel();
+	  }
+
+	  if (this._eventBus.fire('directEditing.activate.allowed', { element: element }) === false) {
+	    return false;
 	  }
 
 	  // the direct editing context
@@ -56177,6 +59178,634 @@
 	}
 
 	/**
+	 * Shared catalog of BPMN element popup entry definitions.
+	 *
+	 * Each entry is the context-independent identity of an element — its `target`
+	 * (moddle type + discriminating attributes), plus the `label` and `className`
+	 * shared across every menu that offers it (create, append, replace).
+	 *
+	 * Menus compose their own option lists from these atoms, adding menu-specific fields
+	 *
+	 * @typedef { {
+	 *   label: string;
+	 *   className: string;
+	 *   target: {
+	 *     type: string;
+	 *     isExpanded?: boolean;
+	 *     triggeredByEvent?: boolean;
+	 *     instantiate?: boolean;
+	 *     eventGatewayType?: string;
+	 *     isInterrupting?: boolean;
+	 *     cancelActivity?: boolean;
+	 *     eventDefinitionType?: string;
+	 *     eventDefinitionAttrs?: Record<string, any>;
+	 *   };
+	 * } } ElementDefinition
+	 *
+	 * @type {Record<string, ElementDefinition>}
+	 */
+	const PopupEntries = {
+
+	  // Tasks
+	  'task': {
+	    label: 'Task',
+	    className: 'bpmn-icon-task',
+	    target: {
+	      type: 'bpmn:Task'
+	    }
+	  },
+	  'user-task': {
+	    label: 'User task',
+	    className: 'bpmn-icon-user',
+	    target: {
+	      type: 'bpmn:UserTask'
+	    }
+	  },
+	  'service-task': {
+	    label: 'Service task',
+	    className: 'bpmn-icon-service',
+	    target: {
+	      type: 'bpmn:ServiceTask'
+	    }
+	  },
+	  'send-task': {
+	    label: 'Send task',
+	    className: 'bpmn-icon-send',
+	    target: {
+	      type: 'bpmn:SendTask'
+	    }
+	  },
+	  'receive-task': {
+	    label: 'Receive task',
+	    className: 'bpmn-icon-receive',
+	    target: {
+	      type: 'bpmn:ReceiveTask'
+	    }
+	  },
+	  'manual-task': {
+	    label: 'Manual task',
+	    className: 'bpmn-icon-manual',
+	    target: {
+	      type: 'bpmn:ManualTask'
+	    }
+	  },
+	  'rule-task': {
+	    label: 'Business rule task',
+	    className: 'bpmn-icon-business-rule',
+	    target: {
+	      type: 'bpmn:BusinessRuleTask'
+	    }
+	  },
+	  'script-task': {
+	    label: 'Script task',
+	    className: 'bpmn-icon-script',
+	    target: {
+	      type: 'bpmn:ScriptTask'
+	    }
+	  },
+
+	  // Sub-processes
+	  'call-activity': {
+	    label: 'Call activity',
+	    className: 'bpmn-icon-call-activity',
+	    target: {
+	      type: 'bpmn:CallActivity'
+	    }
+	  },
+	  'transaction': {
+	    label: 'Transaction',
+	    className: 'bpmn-icon-transaction',
+	    target: {
+	      type: 'bpmn:Transaction',
+	      isExpanded: true
+	    }
+	  },
+	  'event-subprocess': {
+	    label: 'Event sub-process',
+	    className: 'bpmn-icon-event-subprocess-expanded',
+	    target: {
+	      type: 'bpmn:SubProcess',
+	      triggeredByEvent: true,
+	      isExpanded: true
+	    }
+	  },
+	  'collapsed-subprocess': {
+	    label: 'Sub-process (collapsed)',
+	    className: 'bpmn-icon-subprocess-collapsed',
+	    target: {
+	      type: 'bpmn:SubProcess',
+	      isExpanded: false
+	    }
+	  },
+	  'expanded-subprocess': {
+	    label: 'Sub-process (expanded)',
+	    className: 'bpmn-icon-subprocess-expanded',
+	    target: {
+	      type: 'bpmn:SubProcess',
+	      isExpanded: true
+	    }
+	  },
+	  'collapsed-ad-hoc-subprocess': {
+	    label: 'Ad-hoc sub-process (collapsed)',
+	    className: 'bpmn-icon-subprocess-collapsed',
+	    target: {
+	      type: 'bpmn:AdHocSubProcess',
+	      isExpanded: false
+	    }
+	  },
+	  'expanded-ad-hoc-subprocess': {
+	    label: 'Ad-hoc sub-process (expanded)',
+	    className: 'bpmn-icon-subprocess-expanded',
+	    target: {
+	      type: 'bpmn:AdHocSubProcess',
+	      isExpanded: true
+	    }
+	  },
+
+	  // Gateways
+	  'exclusive-gateway': {
+	    label: 'Exclusive gateway',
+	    className: 'bpmn-icon-gateway-xor',
+	    target: {
+	      type: 'bpmn:ExclusiveGateway'
+	    }
+	  },
+	  'parallel-gateway': {
+	    label: 'Parallel gateway',
+	    className: 'bpmn-icon-gateway-parallel',
+	    target: {
+	      type: 'bpmn:ParallelGateway'
+	    }
+	  },
+	  'inclusive-gateway': {
+	    label: 'Inclusive gateway',
+	    className: 'bpmn-icon-gateway-or',
+	    target: {
+	      type: 'bpmn:InclusiveGateway'
+	    }
+	  },
+	  'complex-gateway': {
+	    label: 'Complex gateway',
+	    className: 'bpmn-icon-gateway-complex',
+	    target: {
+	      type: 'bpmn:ComplexGateway'
+	    }
+	  },
+	  'event-based-gateway': {
+	    label: 'Event-based gateway',
+	    className: 'bpmn-icon-gateway-eventbased',
+	    target: {
+	      type: 'bpmn:EventBasedGateway',
+	      instantiate: false,
+	      eventGatewayType: 'Exclusive'
+	    }
+	  },
+
+	  // Data
+	  'data-store-reference': {
+	    label: 'Data store reference',
+	    className: 'bpmn-icon-data-store',
+	    target: {
+	      type: 'bpmn:DataStoreReference'
+	    }
+	  },
+	  'data-object-reference': {
+	    label: 'Data object reference',
+	    className: 'bpmn-icon-data-object',
+	    target: {
+	      type: 'bpmn:DataObjectReference'
+	    }
+	  },
+
+	  // Participants
+	  'expanded-pool': {
+	    label: 'Expanded pool/participant',
+	    className: 'bpmn-icon-participant',
+	    target: {
+	      type: 'bpmn:Participant',
+	      isExpanded: true
+	    }
+	  },
+	  'collapsed-pool': {
+	    label: 'Empty pool/participant',
+	    className: 'bpmn-icon-lane',
+	    target: {
+	      type: 'bpmn:Participant',
+	      isExpanded: false
+	    }
+	  },
+
+	  // Events — none
+	  'none-start-event': {
+	    label: 'Start event',
+	    className: 'bpmn-icon-start-event-none',
+	    target: {
+	      type: 'bpmn:StartEvent'
+	    }
+	  },
+	  'none-intermediate-throwing': {
+	    label: 'Intermediate throw event',
+	    className: 'bpmn-icon-intermediate-event-none',
+	    target: {
+	      type: 'bpmn:IntermediateThrowEvent'
+	    }
+	  },
+	  'none-boundary-event': {
+	    label: 'Boundary event',
+	    className: 'bpmn-icon-intermediate-event-none',
+	    target: {
+	      type: 'bpmn:BoundaryEvent'
+	    }
+	  },
+	  'none-end-event': {
+	    label: 'End event',
+	    className: 'bpmn-icon-end-event-none',
+	    target: {
+	      type: 'bpmn:EndEvent'
+	    }
+	  },
+
+	  // Events — typed start
+	  'message-start': {
+	    label: 'Message start event',
+	    className: 'bpmn-icon-start-event-message',
+	    target: {
+	      type: 'bpmn:StartEvent',
+	      eventDefinitionType: 'bpmn:MessageEventDefinition',
+	      isInterrupting: true
+	    }
+	  },
+	  'timer-start': {
+	    label: 'Timer start event',
+	    className: 'bpmn-icon-start-event-timer',
+	    target: {
+	      type: 'bpmn:StartEvent',
+	      eventDefinitionType: 'bpmn:TimerEventDefinition',
+	      isInterrupting: true
+	    }
+	  },
+	  'conditional-start': {
+	    label: 'Conditional start event',
+	    className: 'bpmn-icon-start-event-condition',
+	    target: {
+	      type: 'bpmn:StartEvent',
+	      eventDefinitionType: 'bpmn:ConditionalEventDefinition',
+	      isInterrupting: true
+	    }
+	  },
+	  'signal-start': {
+	    label: 'Signal start event',
+	    className: 'bpmn-icon-start-event-signal',
+	    target: {
+	      type: 'bpmn:StartEvent',
+	      eventDefinitionType: 'bpmn:SignalEventDefinition',
+	      isInterrupting: true
+	    }
+	  },
+	  'error-start': {
+	    label: 'Error start event',
+	    className: 'bpmn-icon-start-event-error',
+	    target: {
+	      type: 'bpmn:StartEvent',
+	      eventDefinitionType: 'bpmn:ErrorEventDefinition',
+	      isInterrupting: true
+	    }
+	  },
+	  'escalation-start': {
+	    label: 'Escalation start event',
+	    className: 'bpmn-icon-start-event-escalation',
+	    target: {
+	      type: 'bpmn:StartEvent',
+	      eventDefinitionType: 'bpmn:EscalationEventDefinition',
+	      isInterrupting: true
+	    }
+	  },
+	  'compensation-start': {
+	    label: 'Compensation start event',
+	    className: 'bpmn-icon-start-event-compensation',
+	    target: {
+	      type: 'bpmn:StartEvent',
+	      eventDefinitionType: 'bpmn:CompensateEventDefinition',
+	      isInterrupting: true
+	    }
+	  },
+
+	  // Events — non-interrupting start (event subprocess)
+	  'non-interrupting-message-start': {
+	    label: 'Message start event (non-interrupting)',
+	    className: 'bpmn-icon-start-event-non-interrupting-message',
+	    target: {
+	      type: 'bpmn:StartEvent',
+	      eventDefinitionType: 'bpmn:MessageEventDefinition',
+	      isInterrupting: false
+	    }
+	  },
+	  'non-interrupting-timer-start': {
+	    label: 'Timer start event (non-interrupting)',
+	    className: 'bpmn-icon-start-event-non-interrupting-timer',
+	    target: {
+	      type: 'bpmn:StartEvent',
+	      eventDefinitionType: 'bpmn:TimerEventDefinition',
+	      isInterrupting: false
+	    }
+	  },
+	  'non-interrupting-conditional-start': {
+	    label: 'Conditional start event (non-interrupting)',
+	    className: 'bpmn-icon-start-event-non-interrupting-condition',
+	    target: {
+	      type: 'bpmn:StartEvent',
+	      eventDefinitionType: 'bpmn:ConditionalEventDefinition',
+	      isInterrupting: false
+	    }
+	  },
+	  'non-interrupting-signal-start': {
+	    label: 'Signal start event (non-interrupting)',
+	    className: 'bpmn-icon-start-event-non-interrupting-signal',
+	    target: {
+	      type: 'bpmn:StartEvent',
+	      eventDefinitionType: 'bpmn:SignalEventDefinition',
+	      isInterrupting: false
+	    }
+	  },
+	  'non-interrupting-escalation-start': {
+	    label: 'Escalation start event (non-interrupting)',
+	    className: 'bpmn-icon-start-event-non-interrupting-escalation',
+	    target: {
+	      type: 'bpmn:StartEvent',
+	      eventDefinitionType: 'bpmn:EscalationEventDefinition',
+	      isInterrupting: false
+	    }
+	  },
+
+	  // Events — intermediate (catch/throw)
+	  'message-intermediate-catch': {
+	    label: 'Message intermediate catch event',
+	    className: 'bpmn-icon-intermediate-event-catch-message',
+	    target: {
+	      type: 'bpmn:IntermediateCatchEvent',
+	      eventDefinitionType: 'bpmn:MessageEventDefinition'
+	    }
+	  },
+	  'message-intermediate-throw': {
+	    label: 'Message intermediate throw event',
+	    className: 'bpmn-icon-intermediate-event-throw-message',
+	    target: {
+	      type: 'bpmn:IntermediateThrowEvent',
+	      eventDefinitionType: 'bpmn:MessageEventDefinition'
+	    }
+	  },
+	  'timer-intermediate-catch': {
+	    label: 'Timer intermediate catch event',
+	    className: 'bpmn-icon-intermediate-event-catch-timer',
+	    target: {
+	      type: 'bpmn:IntermediateCatchEvent',
+	      eventDefinitionType: 'bpmn:TimerEventDefinition'
+	    }
+	  },
+	  'escalation-intermediate-throw': {
+	    label: 'Escalation intermediate throw event',
+	    className: 'bpmn-icon-intermediate-event-throw-escalation',
+	    target: {
+	      type: 'bpmn:IntermediateThrowEvent',
+	      eventDefinitionType: 'bpmn:EscalationEventDefinition'
+	    }
+	  },
+	  'conditional-intermediate-catch': {
+	    label: 'Conditional intermediate catch event',
+	    className: 'bpmn-icon-intermediate-event-catch-condition',
+	    target: {
+	      type: 'bpmn:IntermediateCatchEvent',
+	      eventDefinitionType: 'bpmn:ConditionalEventDefinition'
+	    }
+	  },
+	  'link-intermediate-catch': {
+	    label: 'Link intermediate catch event',
+	    className: 'bpmn-icon-intermediate-event-catch-link',
+	    target: {
+	      type: 'bpmn:IntermediateCatchEvent',
+	      eventDefinitionType: 'bpmn:LinkEventDefinition',
+	      eventDefinitionAttrs: {
+	        name: ''
+	      }
+	    }
+	  },
+	  'link-intermediate-throw': {
+	    label: 'Link intermediate throw event',
+	    className: 'bpmn-icon-intermediate-event-throw-link',
+	    target: {
+	      type: 'bpmn:IntermediateThrowEvent',
+	      eventDefinitionType: 'bpmn:LinkEventDefinition',
+	      eventDefinitionAttrs: {
+	        name: ''
+	      }
+	    }
+	  },
+	  'compensation-intermediate-throw': {
+	    label: 'Compensation intermediate throw event',
+	    className: 'bpmn-icon-intermediate-event-throw-compensation',
+	    target: {
+	      type: 'bpmn:IntermediateThrowEvent',
+	      eventDefinitionType: 'bpmn:CompensateEventDefinition'
+	    }
+	  },
+	  'signal-intermediate-catch': {
+	    label: 'Signal intermediate catch event',
+	    className: 'bpmn-icon-intermediate-event-catch-signal',
+	    target: {
+	      type: 'bpmn:IntermediateCatchEvent',
+	      eventDefinitionType: 'bpmn:SignalEventDefinition'
+	    }
+	  },
+	  'signal-intermediate-throw': {
+	    label: 'Signal intermediate throw event',
+	    className: 'bpmn-icon-intermediate-event-throw-signal',
+	    target: {
+	      type: 'bpmn:IntermediateThrowEvent',
+	      eventDefinitionType: 'bpmn:SignalEventDefinition'
+	    }
+	  },
+
+	  // Events — boundary (interrupting)
+	  'message-boundary': {
+	    label: 'Message boundary event',
+	    className: 'bpmn-icon-intermediate-event-catch-message',
+	    target: {
+	      type: 'bpmn:BoundaryEvent',
+	      eventDefinitionType: 'bpmn:MessageEventDefinition',
+	      cancelActivity: true
+	    }
+	  },
+	  'timer-boundary': {
+	    label: 'Timer boundary event',
+	    className: 'bpmn-icon-intermediate-event-catch-timer',
+	    target: {
+	      type: 'bpmn:BoundaryEvent',
+	      eventDefinitionType: 'bpmn:TimerEventDefinition',
+	      cancelActivity: true
+	    }
+	  },
+	  'escalation-boundary': {
+	    label: 'Escalation boundary event',
+	    className: 'bpmn-icon-intermediate-event-catch-escalation',
+	    target: {
+	      type: 'bpmn:BoundaryEvent',
+	      eventDefinitionType: 'bpmn:EscalationEventDefinition',
+	      cancelActivity: true
+	    }
+	  },
+	  'conditional-boundary': {
+	    label: 'Conditional boundary event',
+	    className: 'bpmn-icon-intermediate-event-catch-condition',
+	    target: {
+	      type: 'bpmn:BoundaryEvent',
+	      eventDefinitionType: 'bpmn:ConditionalEventDefinition',
+	      cancelActivity: true
+	    }
+	  },
+	  'error-boundary': {
+	    label: 'Error boundary event',
+	    className: 'bpmn-icon-intermediate-event-catch-error',
+	    target: {
+	      type: 'bpmn:BoundaryEvent',
+	      eventDefinitionType: 'bpmn:ErrorEventDefinition',
+	      cancelActivity: true
+	    }
+	  },
+	  'cancel-boundary': {
+	    label: 'Cancel boundary event',
+	    className: 'bpmn-icon-intermediate-event-catch-cancel',
+	    target: {
+	      type: 'bpmn:BoundaryEvent',
+	      eventDefinitionType: 'bpmn:CancelEventDefinition',
+	      cancelActivity: true
+	    }
+	  },
+	  'signal-boundary': {
+	    label: 'Signal boundary event',
+	    className: 'bpmn-icon-intermediate-event-catch-signal',
+	    target: {
+	      type: 'bpmn:BoundaryEvent',
+	      eventDefinitionType: 'bpmn:SignalEventDefinition',
+	      cancelActivity: true
+	    }
+	  },
+	  'compensation-boundary': {
+	    label: 'Compensation boundary event',
+	    className: 'bpmn-icon-intermediate-event-catch-compensation',
+	    target: {
+	      type: 'bpmn:BoundaryEvent',
+	      eventDefinitionType: 'bpmn:CompensateEventDefinition',
+	      cancelActivity: true
+	    }
+	  },
+
+	  // Events — boundary (non-interrupting)
+	  'non-interrupting-message-boundary': {
+	    label: 'Message boundary event (non-interrupting)',
+	    className: 'bpmn-icon-intermediate-event-catch-non-interrupting-message',
+	    target: {
+	      type: 'bpmn:BoundaryEvent',
+	      eventDefinitionType: 'bpmn:MessageEventDefinition',
+	      cancelActivity: false
+	    }
+	  },
+	  'non-interrupting-timer-boundary': {
+	    label: 'Timer boundary event (non-interrupting)',
+	    className: 'bpmn-icon-intermediate-event-catch-non-interrupting-timer',
+	    target: {
+	      type: 'bpmn:BoundaryEvent',
+	      eventDefinitionType: 'bpmn:TimerEventDefinition',
+	      cancelActivity: false
+	    }
+	  },
+	  'non-interrupting-escalation-boundary': {
+	    label: 'Escalation boundary event (non-interrupting)',
+	    className: 'bpmn-icon-intermediate-event-catch-non-interrupting-escalation',
+	    target: {
+	      type: 'bpmn:BoundaryEvent',
+	      eventDefinitionType: 'bpmn:EscalationEventDefinition',
+	      cancelActivity: false
+	    }
+	  },
+	  'non-interrupting-conditional-boundary': {
+	    label: 'Conditional boundary event (non-interrupting)',
+	    className: 'bpmn-icon-intermediate-event-catch-non-interrupting-condition',
+	    target: {
+	      type: 'bpmn:BoundaryEvent',
+	      eventDefinitionType: 'bpmn:ConditionalEventDefinition',
+	      cancelActivity: false
+	    }
+	  },
+	  'non-interrupting-signal-boundary': {
+	    label: 'Signal boundary event (non-interrupting)',
+	    className: 'bpmn-icon-intermediate-event-catch-non-interrupting-signal',
+	    target: {
+	      type: 'bpmn:BoundaryEvent',
+	      eventDefinitionType: 'bpmn:SignalEventDefinition',
+	      cancelActivity: false
+	    }
+	  },
+
+	  // Events — typed end
+	  'message-end': {
+	    label: 'Message end event',
+	    className: 'bpmn-icon-end-event-message',
+	    target: {
+	      type: 'bpmn:EndEvent',
+	      eventDefinitionType: 'bpmn:MessageEventDefinition'
+	    }
+	  },
+	  'escalation-end': {
+	    label: 'Escalation end event',
+	    className: 'bpmn-icon-end-event-escalation',
+	    target: {
+	      type: 'bpmn:EndEvent',
+	      eventDefinitionType: 'bpmn:EscalationEventDefinition'
+	    }
+	  },
+	  'error-end': {
+	    label: 'Error end event',
+	    className: 'bpmn-icon-end-event-error',
+	    target: {
+	      type: 'bpmn:EndEvent',
+	      eventDefinitionType: 'bpmn:ErrorEventDefinition'
+	    }
+	  },
+	  'cancel-end': {
+	    label: 'Cancel end event',
+	    className: 'bpmn-icon-end-event-cancel',
+	    target: {
+	      type: 'bpmn:EndEvent',
+	      eventDefinitionType: 'bpmn:CancelEventDefinition'
+	    }
+	  },
+	  'compensation-end': {
+	    label: 'Compensation end event',
+	    className: 'bpmn-icon-end-event-compensation',
+	    target: {
+	      type: 'bpmn:EndEvent',
+	      eventDefinitionType: 'bpmn:CompensateEventDefinition'
+	    }
+	  },
+	  'signal-end': {
+	    label: 'Signal end event',
+	    className: 'bpmn-icon-end-event-signal',
+	    target: {
+	      type: 'bpmn:EndEvent',
+	      eventDefinitionType: 'bpmn:SignalEventDefinition'
+	    }
+	  },
+	  'terminate-end': {
+	    label: 'Terminate end event',
+	    className: 'bpmn-icon-end-event-terminate',
+	    target: {
+	      type: 'bpmn:EndEvent',
+	      eventDefinitionType: 'bpmn:TerminateEventDefinition'
+	    }
+	  }
+	};
+
+	/**
 	 * @typedef { () => string } LabelGetter
 	 *
 	 * @typedef { {
@@ -56195,367 +59824,96 @@
 	 * } } ReplaceOption
 	 */
 
+
+	/**
+	 * Build a replace option from the shared `PopupEntries` catalog. The `actionName`
+	 * defaults to `replace-with-<id>`.
+	 *
+	 * @param {string} id popup entry id
+	 * @param {Object} [extra] fields to override or add (e.g. `actionName`, `label`)
+	 *
+	 * @return {ReplaceOption}
+	 */
+	function replaceWith(id, extra = {}) {
+	  var entry = PopupEntries[id];
+
+	  if (!entry) {
+	    throw new Error('unknown popup entry <' + id + '>');
+	  }
+
+	  return {
+	    ...entry,
+	    actionName: 'replace-with-' + id,
+	    ...extra
+	  };
+	}
+
 	/**
 	 * @type {ReplaceOption[]}
 	 */
 	var START_EVENT = [
-	  {
-	    label: 'Start event',
-	    actionName: 'replace-with-none-start',
-	    className: 'bpmn-icon-start-event-none',
-	    target: {
-	      type: 'bpmn:StartEvent'
-	    }
-	  },
-	  {
-	    label: 'Intermediate throw event',
-	    actionName: 'replace-with-none-intermediate-throwing',
-	    className: 'bpmn-icon-intermediate-event-none',
-	    target: {
-	      type: 'bpmn:IntermediateThrowEvent'
-	    }
-	  },
-	  {
-	    label: 'End event',
-	    actionName: 'replace-with-none-end',
-	    className: 'bpmn-icon-end-event-none',
-	    target: {
-	      type: 'bpmn:EndEvent'
-	    }
-	  },
-	  {
-	    label: 'Message start event',
-	    actionName: 'replace-with-message-start',
-	    className: 'bpmn-icon-start-event-message',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:MessageEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Timer start event',
-	    actionName: 'replace-with-timer-start',
-	    className: 'bpmn-icon-start-event-timer',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:TimerEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Conditional start event',
-	    actionName: 'replace-with-conditional-start',
-	    className: 'bpmn-icon-start-event-condition',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:ConditionalEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Signal start event',
-	    actionName: 'replace-with-signal-start',
-	    className: 'bpmn-icon-start-event-signal',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:SignalEventDefinition'
-	    }
-	  }
+	  replaceWith('none-start-event', { actionName: 'replace-with-none-start' }),
+	  replaceWith('none-intermediate-throwing'),
+	  replaceWith('none-end-event', { actionName: 'replace-with-none-end' }),
+	  replaceWith('message-start'),
+	  replaceWith('timer-start'),
+	  replaceWith('conditional-start'),
+	  replaceWith('signal-start')
 	];
 
 	/**
 	 * @type {ReplaceOption[]}
 	 */
 	var START_EVENT_SUB_PROCESS = [
-	  {
-	    label: 'Start event',
-	    actionName: 'replace-with-none-start',
-	    className: 'bpmn-icon-start-event-none',
-	    target: {
-	      type: 'bpmn:StartEvent'
-	    }
-	  },
-	  {
-	    label: 'Intermediate throw event',
-	    actionName: 'replace-with-none-intermediate-throwing',
-	    className: 'bpmn-icon-intermediate-event-none',
-	    target: {
-	      type: 'bpmn:IntermediateThrowEvent'
-	    }
-	  },
-	  {
-	    label: 'End event',
-	    actionName: 'replace-with-none-end',
-	    className: 'bpmn-icon-end-event-none',
-	    target: {
-	      type: 'bpmn:EndEvent'
-	    }
-	  }
+	  replaceWith('none-start-event', { actionName: 'replace-with-none-start' }),
+	  replaceWith('none-intermediate-throwing'),
+	  replaceWith('none-end-event', { actionName: 'replace-with-none-end' })
 	];
 
 	/**
 	 * @type {ReplaceOption[]}
 	 */
 	var INTERMEDIATE_EVENT = [
-	  {
-	    label: 'Start event',
-	    actionName: 'replace-with-none-start',
-	    className: 'bpmn-icon-start-event-none',
-	    target: {
-	      type: 'bpmn:StartEvent'
-	    }
-	  },
-	  {
-	    label: 'Intermediate throw event',
-	    actionName: 'replace-with-none-intermediate-throw',
-	    className: 'bpmn-icon-intermediate-event-none',
-	    target: {
-	      type: 'bpmn:IntermediateThrowEvent'
-	    }
-	  },
-	  {
-	    label: 'End event',
-	    actionName: 'replace-with-none-end',
-	    className: 'bpmn-icon-end-event-none',
-	    target: {
-	      type: 'bpmn:EndEvent'
-	    }
-	  },
-	  {
-	    label: 'Message intermediate catch event',
-	    actionName: 'replace-with-message-intermediate-catch',
-	    className: 'bpmn-icon-intermediate-event-catch-message',
-	    target: {
-	      type: 'bpmn:IntermediateCatchEvent',
-	      eventDefinitionType: 'bpmn:MessageEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Message intermediate throw event',
-	    actionName: 'replace-with-message-intermediate-throw',
-	    className: 'bpmn-icon-intermediate-event-throw-message',
-	    target: {
-	      type: 'bpmn:IntermediateThrowEvent',
-	      eventDefinitionType: 'bpmn:MessageEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Timer intermediate catch event',
-	    actionName: 'replace-with-timer-intermediate-catch',
-	    className: 'bpmn-icon-intermediate-event-catch-timer',
-	    target: {
-	      type: 'bpmn:IntermediateCatchEvent',
-	      eventDefinitionType: 'bpmn:TimerEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Escalation intermediate throw event',
-	    actionName: 'replace-with-escalation-intermediate-throw',
-	    className: 'bpmn-icon-intermediate-event-throw-escalation',
-	    target: {
-	      type: 'bpmn:IntermediateThrowEvent',
-	      eventDefinitionType: 'bpmn:EscalationEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Conditional intermediate catch event',
-	    actionName: 'replace-with-conditional-intermediate-catch',
-	    className: 'bpmn-icon-intermediate-event-catch-condition',
-	    target: {
-	      type: 'bpmn:IntermediateCatchEvent',
-	      eventDefinitionType: 'bpmn:ConditionalEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Link intermediate catch event',
-	    actionName: 'replace-with-link-intermediate-catch',
-	    className: 'bpmn-icon-intermediate-event-catch-link',
-	    target: {
-	      type: 'bpmn:IntermediateCatchEvent',
-	      eventDefinitionType: 'bpmn:LinkEventDefinition',
-	      eventDefinitionAttrs: {
-	        name: ''
-	      }
-	    }
-	  },
-	  {
-	    label: 'Link intermediate throw event',
-	    actionName: 'replace-with-link-intermediate-throw',
-	    className: 'bpmn-icon-intermediate-event-throw-link',
-	    target: {
-	      type: 'bpmn:IntermediateThrowEvent',
-	      eventDefinitionType: 'bpmn:LinkEventDefinition',
-	      eventDefinitionAttrs: {
-	        name: ''
-	      }
-	    }
-	  },
-	  {
-	    label: 'Compensation intermediate throw event',
-	    actionName: 'replace-with-compensation-intermediate-throw',
-	    className: 'bpmn-icon-intermediate-event-throw-compensation',
-	    target: {
-	      type: 'bpmn:IntermediateThrowEvent',
-	      eventDefinitionType: 'bpmn:CompensateEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Signal intermediate catch event',
-	    actionName: 'replace-with-signal-intermediate-catch',
-	    className: 'bpmn-icon-intermediate-event-catch-signal',
-	    target: {
-	      type: 'bpmn:IntermediateCatchEvent',
-	      eventDefinitionType: 'bpmn:SignalEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Signal intermediate throw event',
-	    actionName: 'replace-with-signal-intermediate-throw',
-	    className: 'bpmn-icon-intermediate-event-throw-signal',
-	    target: {
-	      type: 'bpmn:IntermediateThrowEvent',
-	      eventDefinitionType: 'bpmn:SignalEventDefinition'
-	    }
-	  }
+	  replaceWith('none-start-event', { actionName: 'replace-with-none-start' }),
+	  replaceWith('none-intermediate-throwing', { actionName: 'replace-with-none-intermediate-throw' }),
+	  replaceWith('none-end-event', { actionName: 'replace-with-none-end' }),
+	  replaceWith('message-intermediate-catch'),
+	  replaceWith('message-intermediate-throw'),
+	  replaceWith('timer-intermediate-catch'),
+	  replaceWith('escalation-intermediate-throw'),
+	  replaceWith('conditional-intermediate-catch'),
+	  replaceWith('link-intermediate-catch'),
+	  replaceWith('link-intermediate-throw'),
+	  replaceWith('compensation-intermediate-throw'),
+	  replaceWith('signal-intermediate-catch'),
+	  replaceWith('signal-intermediate-throw')
 	];
 
 	/**
 	 * @type {ReplaceOption[]}
 	 */
 	var END_EVENT = [
-	  {
-	    label: 'Start event',
-	    actionName: 'replace-with-none-start',
-	    className: 'bpmn-icon-start-event-none',
-	    target: {
-	      type: 'bpmn:StartEvent'
-	    }
-	  },
-	  {
-	    label: 'Intermediate throw event',
-	    actionName: 'replace-with-none-intermediate-throw',
-	    className: 'bpmn-icon-intermediate-event-none',
-	    target: {
-	      type: 'bpmn:IntermediateThrowEvent'
-	    }
-	  },
-	  {
-	    label: 'End event',
-	    actionName: 'replace-with-none-end',
-	    className: 'bpmn-icon-end-event-none',
-	    target: {
-	      type: 'bpmn:EndEvent'
-	    }
-	  },
-	  {
-	    label: 'Message end event',
-	    actionName: 'replace-with-message-end',
-	    className: 'bpmn-icon-end-event-message',
-	    target: {
-	      type: 'bpmn:EndEvent',
-	      eventDefinitionType: 'bpmn:MessageEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Escalation end event',
-	    actionName: 'replace-with-escalation-end',
-	    className: 'bpmn-icon-end-event-escalation',
-	    target: {
-	      type: 'bpmn:EndEvent',
-	      eventDefinitionType: 'bpmn:EscalationEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Error end event',
-	    actionName: 'replace-with-error-end',
-	    className: 'bpmn-icon-end-event-error',
-	    target: {
-	      type: 'bpmn:EndEvent',
-	      eventDefinitionType: 'bpmn:ErrorEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Cancel end event',
-	    actionName: 'replace-with-cancel-end',
-	    className: 'bpmn-icon-end-event-cancel',
-	    target: {
-	      type: 'bpmn:EndEvent',
-	      eventDefinitionType: 'bpmn:CancelEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Compensation end event',
-	    actionName: 'replace-with-compensation-end',
-	    className: 'bpmn-icon-end-event-compensation',
-	    target: {
-	      type: 'bpmn:EndEvent',
-	      eventDefinitionType: 'bpmn:CompensateEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Signal end event',
-	    actionName: 'replace-with-signal-end',
-	    className: 'bpmn-icon-end-event-signal',
-	    target: {
-	      type: 'bpmn:EndEvent',
-	      eventDefinitionType: 'bpmn:SignalEventDefinition'
-	    }
-	  },
-	  {
-	    label: 'Terminate end event',
-	    actionName: 'replace-with-terminate-end',
-	    className: 'bpmn-icon-end-event-terminate',
-	    target: {
-	      type: 'bpmn:EndEvent',
-	      eventDefinitionType: 'bpmn:TerminateEventDefinition'
-	    }
-	  }
+	  replaceWith('none-start-event', { actionName: 'replace-with-none-start' }),
+	  replaceWith('none-intermediate-throwing', { actionName: 'replace-with-none-intermediate-throw' }),
+	  replaceWith('none-end-event', { actionName: 'replace-with-none-end' }),
+	  replaceWith('message-end'),
+	  replaceWith('escalation-end'),
+	  replaceWith('error-end'),
+	  replaceWith('cancel-end'),
+	  replaceWith('compensation-end'),
+	  replaceWith('signal-end'),
+	  replaceWith('terminate-end')
 	];
 
 	/**
 	 * @type {ReplaceOption[]}
 	 */
 	var GATEWAY = [
-	  {
-	    label: 'Exclusive gateway',
-	    actionName: 'replace-with-exclusive-gateway',
-	    className: 'bpmn-icon-gateway-xor',
-	    target: {
-	      type: 'bpmn:ExclusiveGateway'
-	    }
-	  },
-	  {
-	    label: 'Parallel gateway',
-	    actionName: 'replace-with-parallel-gateway',
-	    className: 'bpmn-icon-gateway-parallel',
-	    target: {
-	      type: 'bpmn:ParallelGateway'
-	    }
-	  },
-	  {
-	    label: 'Inclusive gateway',
-	    actionName: 'replace-with-inclusive-gateway',
-	    className: 'bpmn-icon-gateway-or',
-	    target: {
-	      type: 'bpmn:InclusiveGateway'
-	    }
-	  },
-	  {
-	    label: 'Complex gateway',
-	    actionName: 'replace-with-complex-gateway',
-	    className: 'bpmn-icon-gateway-complex',
-	    target: {
-	      type: 'bpmn:ComplexGateway'
-	    }
-	  },
-	  {
-	    label: 'Event-based gateway',
-	    actionName: 'replace-with-event-based-gateway',
-	    className: 'bpmn-icon-gateway-eventbased',
-	    target: {
-	      type: 'bpmn:EventBasedGateway',
-	      instantiate: false,
-	      eventGatewayType: 'Exclusive'
-	    }
-	  }
+	  replaceWith('exclusive-gateway'),
+	  replaceWith('parallel-gateway'),
+	  replaceWith('inclusive-gateway'),
+	  replaceWith('complex-gateway'),
+	  replaceWith('event-based-gateway')
 
 	  // Gateways deactivated until https://github.com/bpmn-io/bpmn-js/issues/194
 	  // {
@@ -56586,129 +59944,30 @@
 	 * @type {ReplaceOption[]}
 	 */
 	var SUBPROCESS_EXPANDED = [
-	  {
-	    label: 'Transaction',
-	    actionName: 'replace-with-transaction',
-	    className: 'bpmn-icon-transaction',
-	    target: {
-	      type: 'bpmn:Transaction',
-	      isExpanded: true
-	    }
-	  },
-	  {
-	    label: 'Event sub-process',
-	    actionName: 'replace-with-event-subprocess',
-	    className: 'bpmn-icon-event-subprocess-expanded',
-	    target: {
-	      type: 'bpmn:SubProcess',
-	      triggeredByEvent: true,
-	      isExpanded: true
-	    }
-	  },
-	  {
-	    label: 'Ad-hoc sub-process',
-	    actionName: 'replace-with-ad-hoc-subprocess',
-	    className: 'bpmn-icon-subprocess-expanded',
-	    target: {
-	      type: 'bpmn:AdHocSubProcess',
-	      isExpanded: true
-	    }
-	  },
-	  {
-	    label: 'Sub-process (collapsed)',
-	    actionName: 'replace-with-collapsed-subprocess',
-	    className: 'bpmn-icon-subprocess-collapsed',
-	    target: {
-	      type: 'bpmn:SubProcess',
-	      isExpanded: false
-	    }
-	  }
+	  replaceWith('transaction'),
+	  replaceWith('event-subprocess'),
+	  replaceWith('expanded-ad-hoc-subprocess', { actionName: 'replace-with-ad-hoc-subprocess', label: 'Ad-hoc sub-process' }),
+	  replaceWith('collapsed-subprocess')
 	];
 
 	/**
 	 * @type {ReplaceOption[]}
 	 */
 	var AD_HOC_SUBPROCESS_EXPANDED = [
-	  {
-	    label: 'Sub-process',
-	    actionName: 'replace-with-subprocess',
-	    className: 'bpmn-icon-subprocess-expanded',
-	    target: {
-	      type: 'bpmn:SubProcess',
-	      isExpanded: true
-	    }
-	  },
-	  {
-	    label: 'Transaction',
-	    actionName: 'replace-with-transaction',
-	    className: 'bpmn-icon-transaction',
-	    target: {
-	      type: 'bpmn:Transaction',
-	      isExpanded: true
-	    }
-	  },
-	  {
-	    label: 'Event sub-process',
-	    actionName: 'replace-with-event-subprocess',
-	    className: 'bpmn-icon-event-subprocess-expanded',
-	    target: {
-	      type: 'bpmn:SubProcess',
-	      triggeredByEvent: true,
-	      isExpanded: true
-	    }
-	  },
-	  {
-	    label: 'Ad-hoc sub-process (collapsed)',
-	    actionName: 'replace-with-collapsed-ad-hoc-subprocess',
-	    className: 'bpmn-icon-subprocess-collapsed',
-	    target: {
-	      type: 'bpmn:AdHocSubProcess',
-	      isExpanded: false
-	    }
-	  }
+	  replaceWith('expanded-subprocess', { actionName: 'replace-with-subprocess', label: 'Sub-process' }),
+	  replaceWith('transaction'),
+	  replaceWith('event-subprocess'),
+	  replaceWith('collapsed-ad-hoc-subprocess')
 	];
 
 	/**
 	 * @type {ReplaceOption[]}
 	 */
 	var TRANSACTION = [
-	  {
-	    label: 'Transaction',
-	    actionName: 'replace-with-transaction',
-	    className: 'bpmn-icon-transaction',
-	    target: {
-	      type: 'bpmn:Transaction',
-	      isExpanded: true
-	    }
-	  },
-	  {
-	    label: 'Sub-process',
-	    actionName: 'replace-with-subprocess',
-	    className: 'bpmn-icon-subprocess-expanded',
-	    target: {
-	      type: 'bpmn:SubProcess',
-	      isExpanded: true
-	    }
-	  },
-	  {
-	    label: 'Ad-hoc sub-process',
-	    actionName: 'replace-with-ad-hoc-subprocess',
-	    className: 'bpmn-icon-subprocess-expanded',
-	    target: {
-	      type: 'bpmn:AdHocSubProcess',
-	      isExpanded: true
-	    }
-	  },
-	  {
-	    label: 'Event sub-process',
-	    actionName: 'replace-with-event-subprocess',
-	    className: 'bpmn-icon-event-subprocess-expanded',
-	    target: {
-	      type: 'bpmn:SubProcess',
-	      triggeredByEvent: true,
-	      isExpanded: true
-	    }
-	  }
+	  replaceWith('transaction'),
+	  replaceWith('expanded-subprocess', { actionName: 'replace-with-subprocess', label: 'Sub-process' }),
+	  replaceWith('expanded-ad-hoc-subprocess', { actionName: 'replace-with-ad-hoc-subprocess', label: 'Ad-hoc sub-process' }),
+	  replaceWith('event-subprocess')
 	];
 
 	/**
@@ -56720,404 +59979,70 @@
 	 * @type {ReplaceOption[]}
 	 */
 	var TASK = [
-	  {
-	    label: 'Task',
-	    actionName: 'replace-with-task',
-	    className: 'bpmn-icon-task',
-	    target: {
-	      type: 'bpmn:Task'
-	    }
-	  },
-	  {
-	    label: 'User task',
-	    actionName: 'replace-with-user-task',
-	    className: 'bpmn-icon-user',
-	    target: {
-	      type: 'bpmn:UserTask'
-	    }
-	  },
-	  {
-	    label: 'Service task',
-	    actionName: 'replace-with-service-task',
-	    className: 'bpmn-icon-service',
-	    target: {
-	      type: 'bpmn:ServiceTask'
-	    }
-	  },
-	  {
-	    label: 'Send task',
-	    actionName: 'replace-with-send-task',
-	    className: 'bpmn-icon-send',
-	    target: {
-	      type: 'bpmn:SendTask'
-	    }
-	  },
-	  {
-	    label: 'Receive task',
-	    actionName: 'replace-with-receive-task',
-	    className: 'bpmn-icon-receive',
-	    target: {
-	      type: 'bpmn:ReceiveTask'
-	    }
-	  },
-	  {
-	    label: 'Manual task',
-	    actionName: 'replace-with-manual-task',
-	    className: 'bpmn-icon-manual',
-	    target: {
-	      type: 'bpmn:ManualTask'
-	    }
-	  },
-	  {
-	    label: 'Business rule task',
-	    actionName: 'replace-with-rule-task',
-	    className: 'bpmn-icon-business-rule',
-	    target: {
-	      type: 'bpmn:BusinessRuleTask'
-	    }
-	  },
-	  {
-	    label: 'Script task',
-	    actionName: 'replace-with-script-task',
-	    className: 'bpmn-icon-script',
-	    target: {
-	      type: 'bpmn:ScriptTask'
-	    }
-	  },
-	  {
-	    label: 'Call activity',
-	    actionName: 'replace-with-call-activity',
-	    className: 'bpmn-icon-call-activity',
-	    target: {
-	      type: 'bpmn:CallActivity'
-	    }
-	  },
-	  {
-	    label: 'Sub-process (collapsed)',
-	    actionName: 'replace-with-collapsed-subprocess',
-	    className: 'bpmn-icon-subprocess-collapsed',
-	    target: {
-	      type: 'bpmn:SubProcess',
-	      isExpanded: false
-	    }
-	  },
-	  {
-	    label: 'Sub-process (expanded)',
-	    actionName: 'replace-with-expanded-subprocess',
-	    className: 'bpmn-icon-subprocess-expanded',
-	    target: {
-	      type: 'bpmn:SubProcess',
-	      isExpanded: true
-	    }
-	  },
-	  {
-	    label: 'Ad-hoc sub-process (collapsed)',
-	    actionName: 'replace-with-collapsed-ad-hoc-subprocess',
-	    className: 'bpmn-icon-subprocess-collapsed',
-	    target: {
-	      type: 'bpmn:AdHocSubProcess',
-	      isExpanded: false
-	    }
-	  },
-	  {
-	    label: 'Ad-hoc sub-process (expanded)',
-	    actionName: 'replace-with-ad-hoc-subprocess',
-	    className: 'bpmn-icon-subprocess-expanded',
-	    target: {
-	      type: 'bpmn:AdHocSubProcess',
-	      isExpanded: true
-	    }
-	  }
+	  replaceWith('task'),
+	  replaceWith('user-task'),
+	  replaceWith('service-task'),
+	  replaceWith('send-task'),
+	  replaceWith('receive-task'),
+	  replaceWith('manual-task'),
+	  replaceWith('rule-task'),
+	  replaceWith('script-task'),
+	  replaceWith('call-activity'),
+	  replaceWith('collapsed-subprocess'),
+	  replaceWith('expanded-subprocess'),
+	  replaceWith('collapsed-ad-hoc-subprocess'),
+	  replaceWith('expanded-ad-hoc-subprocess', { actionName: 'replace-with-ad-hoc-subprocess' })
 	];
 
 	/**
 	 * @type {ReplaceOption[]}
 	 */
 	var DATA_OBJECT_REFERENCE = [
-	  {
-	    label: 'Data store reference',
-	    actionName: 'replace-with-data-store-reference',
-	    className: 'bpmn-icon-data-store',
-	    target: {
-	      type: 'bpmn:DataStoreReference'
-	    }
-	  }
+	  replaceWith('data-store-reference')
 	];
 
 	/**
 	 * @type {ReplaceOption[]}
 	 */
 	var DATA_STORE_REFERENCE = [
-	  {
-	    label: 'Data object reference',
-	    actionName: 'replace-with-data-object-reference',
-	    className: 'bpmn-icon-data-object',
-	    target: {
-	      type: 'bpmn:DataObjectReference'
-	    }
-	  }
+	  replaceWith('data-object-reference')
 	];
 
 	/**
 	 * @type {ReplaceOption[]}
 	 */
 	var BOUNDARY_EVENT = [
-	  {
-	    label: 'Message boundary event',
-	    actionName: 'replace-with-message-boundary',
-	    className: 'bpmn-icon-intermediate-event-catch-message',
-	    target: {
-	      type: 'bpmn:BoundaryEvent',
-	      eventDefinitionType: 'bpmn:MessageEventDefinition',
-	      cancelActivity: true
-	    }
-	  },
-	  {
-	    label: 'Timer boundary event',
-	    actionName: 'replace-with-timer-boundary',
-	    className: 'bpmn-icon-intermediate-event-catch-timer',
-	    target: {
-	      type: 'bpmn:BoundaryEvent',
-	      eventDefinitionType: 'bpmn:TimerEventDefinition',
-	      cancelActivity: true
-	    }
-	  },
-	  {
-	    label: 'Escalation boundary event',
-	    actionName: 'replace-with-escalation-boundary',
-	    className: 'bpmn-icon-intermediate-event-catch-escalation',
-	    target: {
-	      type: 'bpmn:BoundaryEvent',
-	      eventDefinitionType: 'bpmn:EscalationEventDefinition',
-	      cancelActivity: true
-	    }
-	  },
-	  {
-	    label: 'Conditional boundary event',
-	    actionName: 'replace-with-conditional-boundary',
-	    className: 'bpmn-icon-intermediate-event-catch-condition',
-	    target: {
-	      type: 'bpmn:BoundaryEvent',
-	      eventDefinitionType: 'bpmn:ConditionalEventDefinition',
-	      cancelActivity: true
-	    }
-	  },
-	  {
-	    label: 'Error boundary event',
-	    actionName: 'replace-with-error-boundary',
-	    className: 'bpmn-icon-intermediate-event-catch-error',
-	    target: {
-	      type: 'bpmn:BoundaryEvent',
-	      eventDefinitionType: 'bpmn:ErrorEventDefinition',
-	      cancelActivity: true
-	    }
-	  },
-	  {
-	    label: 'Cancel boundary event',
-	    actionName: 'replace-with-cancel-boundary',
-	    className: 'bpmn-icon-intermediate-event-catch-cancel',
-	    target: {
-	      type: 'bpmn:BoundaryEvent',
-	      eventDefinitionType: 'bpmn:CancelEventDefinition',
-	      cancelActivity: true
-	    }
-	  },
-	  {
-	    label: 'Signal boundary event',
-	    actionName: 'replace-with-signal-boundary',
-	    className: 'bpmn-icon-intermediate-event-catch-signal',
-	    target: {
-	      type: 'bpmn:BoundaryEvent',
-	      eventDefinitionType: 'bpmn:SignalEventDefinition',
-	      cancelActivity: true
-	    }
-	  },
-	  {
-	    label: 'Compensation boundary event',
-	    actionName: 'replace-with-compensation-boundary',
-	    className: 'bpmn-icon-intermediate-event-catch-compensation',
-	    target: {
-	      type: 'bpmn:BoundaryEvent',
-	      eventDefinitionType: 'bpmn:CompensateEventDefinition',
-	      cancelActivity: true
-	    }
-	  },
-	  {
-	    label: 'Message boundary event (non-interrupting)',
-	    actionName: 'replace-with-non-interrupting-message-boundary',
-	    className: 'bpmn-icon-intermediate-event-catch-non-interrupting-message',
-	    target: {
-	      type: 'bpmn:BoundaryEvent',
-	      eventDefinitionType: 'bpmn:MessageEventDefinition',
-	      cancelActivity: false
-	    }
-	  },
-	  {
-	    label: 'Timer boundary event (non-interrupting)',
-	    actionName: 'replace-with-non-interrupting-timer-boundary',
-	    className: 'bpmn-icon-intermediate-event-catch-non-interrupting-timer',
-	    target: {
-	      type: 'bpmn:BoundaryEvent',
-	      eventDefinitionType: 'bpmn:TimerEventDefinition',
-	      cancelActivity: false
-	    }
-	  },
-	  {
-	    label: 'Escalation boundary event (non-interrupting)',
-	    actionName: 'replace-with-non-interrupting-escalation-boundary',
-	    className: 'bpmn-icon-intermediate-event-catch-non-interrupting-escalation',
-	    target: {
-	      type: 'bpmn:BoundaryEvent',
-	      eventDefinitionType: 'bpmn:EscalationEventDefinition',
-	      cancelActivity: false
-	    }
-	  },
-	  {
-	    label: 'Conditional boundary event (non-interrupting)',
-	    actionName: 'replace-with-non-interrupting-conditional-boundary',
-	    className: 'bpmn-icon-intermediate-event-catch-non-interrupting-condition',
-	    target: {
-	      type: 'bpmn:BoundaryEvent',
-	      eventDefinitionType: 'bpmn:ConditionalEventDefinition',
-	      cancelActivity: false
-	    }
-	  },
-	  {
-	    label: 'Signal boundary event (non-interrupting)',
-	    actionName: 'replace-with-non-interrupting-signal-boundary',
-	    className: 'bpmn-icon-intermediate-event-catch-non-interrupting-signal',
-	    target: {
-	      type: 'bpmn:BoundaryEvent',
-	      eventDefinitionType: 'bpmn:SignalEventDefinition',
-	      cancelActivity: false
-	    }
-	  }
+	  replaceWith('message-boundary'),
+	  replaceWith('timer-boundary'),
+	  replaceWith('escalation-boundary'),
+	  replaceWith('conditional-boundary'),
+	  replaceWith('error-boundary'),
+	  replaceWith('cancel-boundary'),
+	  replaceWith('signal-boundary'),
+	  replaceWith('compensation-boundary'),
+	  replaceWith('non-interrupting-message-boundary'),
+	  replaceWith('non-interrupting-timer-boundary'),
+	  replaceWith('non-interrupting-escalation-boundary'),
+	  replaceWith('non-interrupting-conditional-boundary'),
+	  replaceWith('non-interrupting-signal-boundary')
 	];
 
 	/**
 	 * @type {ReplaceOption[]}
 	 */
 	var EVENT_SUB_PROCESS_START_EVENT = [
-	  {
-	    label: 'Message start event',
-	    actionName: 'replace-with-message-start',
-	    className: 'bpmn-icon-start-event-message',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:MessageEventDefinition',
-	      isInterrupting: true
-	    }
-	  },
-	  {
-	    label: 'Timer start event',
-	    actionName: 'replace-with-timer-start',
-	    className: 'bpmn-icon-start-event-timer',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:TimerEventDefinition',
-	      isInterrupting: true
-	    }
-	  },
-	  {
-	    label: 'Conditional start event',
-	    actionName: 'replace-with-conditional-start',
-	    className: 'bpmn-icon-start-event-condition',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:ConditionalEventDefinition',
-	      isInterrupting: true
-	    }
-	  },
-	  {
-	    label: 'Signal start event',
-	    actionName: 'replace-with-signal-start',
-	    className: 'bpmn-icon-start-event-signal',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:SignalEventDefinition',
-	      isInterrupting: true
-	    }
-	  },
-	  {
-	    label: 'Error start event',
-	    actionName: 'replace-with-error-start',
-	    className: 'bpmn-icon-start-event-error',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:ErrorEventDefinition',
-	      isInterrupting: true
-	    }
-	  },
-	  {
-	    label: 'Escalation start event',
-	    actionName: 'replace-with-escalation-start',
-	    className: 'bpmn-icon-start-event-escalation',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:EscalationEventDefinition',
-	      isInterrupting: true
-	    }
-	  },
-	  {
-	    label: 'Compensation start event',
-	    actionName: 'replace-with-compensation-start',
-	    className: 'bpmn-icon-start-event-compensation',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:CompensateEventDefinition',
-	      isInterrupting: true
-	    }
-	  },
-	  {
-	    label: 'Message start event (non-interrupting)',
-	    actionName: 'replace-with-non-interrupting-message-start',
-	    className: 'bpmn-icon-start-event-non-interrupting-message',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:MessageEventDefinition',
-	      isInterrupting: false
-	    }
-	  },
-	  {
-	    label: 'Timer start event (non-interrupting)',
-	    actionName: 'replace-with-non-interrupting-timer-start',
-	    className: 'bpmn-icon-start-event-non-interrupting-timer',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:TimerEventDefinition',
-	      isInterrupting: false
-	    }
-	  },
-	  {
-	    label: 'Conditional start event (non-interrupting)',
-	    actionName: 'replace-with-non-interrupting-conditional-start',
-	    className: 'bpmn-icon-start-event-non-interrupting-condition',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:ConditionalEventDefinition',
-	      isInterrupting: false
-	    }
-	  },
-	  {
-	    label: 'Signal start event (non-interrupting)',
-	    actionName: 'replace-with-non-interrupting-signal-start',
-	    className: 'bpmn-icon-start-event-non-interrupting-signal',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:SignalEventDefinition',
-	      isInterrupting: false
-	    }
-	  },
-	  {
-	    label: 'Escalation start event (non-interrupting)',
-	    actionName: 'replace-with-non-interrupting-escalation-start',
-	    className: 'bpmn-icon-start-event-non-interrupting-escalation',
-	    target: {
-	      type: 'bpmn:StartEvent',
-	      eventDefinitionType: 'bpmn:EscalationEventDefinition',
-	      isInterrupting: false
-	    }
-	  }
+	  replaceWith('message-start'),
+	  replaceWith('timer-start'),
+	  replaceWith('conditional-start'),
+	  replaceWith('signal-start'),
+	  replaceWith('error-start'),
+	  replaceWith('escalation-start'),
+	  replaceWith('compensation-start'),
+	  replaceWith('non-interrupting-message-start'),
+	  replaceWith('non-interrupting-timer-start'),
+	  replaceWith('non-interrupting-conditional-start'),
+	  replaceWith('non-interrupting-signal-start'),
+	  replaceWith('non-interrupting-escalation-start')
 	];
 
 	/**
@@ -57145,16 +60070,8 @@
 	 * @type {ReplaceOption[]}
 	 */
 	var PARTICIPANT = [
-	  {
-	    label: 'Expanded pool/participant',
-	    actionName: 'replace-with-expanded-pool',
-	    className: 'bpmn-icon-participant',
-	    target: {
-	      type: 'bpmn:Participant',
-	      isExpanded: true
-	    }
-	  },
-	  {
+	  replaceWith('expanded-pool'),
+	  replaceWith('collapsed-pool', {
 	    label: function(element) {
 	      var label = 'Empty pool/participant';
 
@@ -57163,16 +60080,8 @@
 	      }
 
 	      return label;
-	    },
-	    actionName: 'replace-with-collapsed-pool',
-
-	    // TODO(@janstuemmel): maybe design new icon
-	    className: 'bpmn-icon-lane',
-	    target: {
-	      type: 'bpmn:Participant',
-	      isExpanded: false
 	    }
-	  }
+	  })
 	];
 
 	/**
@@ -57180,205 +60089,38 @@
 	 */
 	var TYPED_EVENT = {
 	  'bpmn:MessageEventDefinition': [
-	    {
-	      label: 'Message start event',
-	      actionName: 'replace-with-message-start',
-	      className: 'bpmn-icon-start-event-message',
-	      target: {
-	        type: 'bpmn:StartEvent',
-	        eventDefinitionType: 'bpmn:MessageEventDefinition',
-	        isInterrupting: true
-	      }
-	    },
-	    {
-	      label: 'Message intermediate catch event',
-	      actionName: 'replace-with-message-intermediate-catch',
-	      className: 'bpmn-icon-intermediate-event-catch-message',
-	      target: {
-	        type: 'bpmn:IntermediateCatchEvent',
-	        eventDefinitionType: 'bpmn:MessageEventDefinition'
-	      }
-	    },
-	    {
-	      label: 'Message intermediate throw event',
-	      actionName: 'replace-with-message-intermediate-throw',
-	      className: 'bpmn-icon-intermediate-event-throw-message',
-	      target: {
-	        type: 'bpmn:IntermediateThrowEvent',
-	        eventDefinitionType: 'bpmn:MessageEventDefinition'
-	      }
-	    },
-	    {
-	      label: 'Message end event',
-	      actionName: 'replace-with-message-end',
-	      className: 'bpmn-icon-end-event-message',
-	      target: {
-	        type: 'bpmn:EndEvent',
-	        eventDefinitionType: 'bpmn:MessageEventDefinition'
-	      }
-	    }
+	    replaceWith('message-start'),
+	    replaceWith('message-intermediate-catch'),
+	    replaceWith('message-intermediate-throw'),
+	    replaceWith('message-end')
 	  ],
 	  'bpmn:TimerEventDefinition': [
-	    {
-	      label: 'Timer start event',
-	      actionName: 'replace-with-timer-start',
-	      className: 'bpmn-icon-start-event-timer',
-	      target: {
-	        type: 'bpmn:StartEvent',
-	        eventDefinitionType: 'bpmn:TimerEventDefinition',
-	        isInterrupting: true
-	      }
-	    },
-	    {
-	      label: 'Timer intermediate catch event',
-	      actionName: 'replace-with-timer-intermediate-catch',
-	      className: 'bpmn-icon-intermediate-event-catch-timer',
-	      target: {
-	        type: 'bpmn:IntermediateCatchEvent',
-	        eventDefinitionType: 'bpmn:TimerEventDefinition'
-	      }
-	    }
+	    replaceWith('timer-start'),
+	    replaceWith('timer-intermediate-catch')
 	  ],
 	  'bpmn:ConditionalEventDefinition': [
-	    {
-	      label: 'Conditional start event',
-	      actionName: 'replace-with-conditional-start',
-	      className: 'bpmn-icon-start-event-condition',
-	      target: {
-	        type: 'bpmn:StartEvent',
-	        eventDefinitionType: 'bpmn:ConditionalEventDefinition',
-	        isInterrupting: true
-	      }
-	    },
-	    {
-	      label: 'Conditional intermediate catch event',
-	      actionName: 'replace-with-conditional-intermediate-catch',
-	      className: 'bpmn-icon-intermediate-event-catch-condition',
-	      target: {
-	        type: 'bpmn:IntermediateCatchEvent',
-	        eventDefinitionType: 'bpmn:ConditionalEventDefinition'
-	      }
-	    }
+	    replaceWith('conditional-start'),
+	    replaceWith('conditional-intermediate-catch')
 	  ],
 	  'bpmn:SignalEventDefinition': [
-	    {
-	      label: 'Signal start event',
-	      actionName: 'replace-with-signal-start',
-	      className: 'bpmn-icon-start-event-signal',
-	      target: {
-	        type: 'bpmn:StartEvent',
-	        eventDefinitionType: 'bpmn:SignalEventDefinition',
-	        isInterrupting: true
-	      }
-	    },
-	    {
-	      label: 'Signal intermediate catch event',
-	      actionName: 'replace-with-signal-intermediate-catch',
-	      className: 'bpmn-icon-intermediate-event-catch-signal',
-	      target: {
-	        type: 'bpmn:IntermediateCatchEvent',
-	        eventDefinitionType: 'bpmn:SignalEventDefinition'
-	      }
-	    },
-	    {
-	      label: 'Signal intermediate throw event',
-	      actionName: 'replace-with-signal-intermediate-throw',
-	      className: 'bpmn-icon-intermediate-event-throw-signal',
-	      target: {
-	        type: 'bpmn:IntermediateThrowEvent',
-	        eventDefinitionType: 'bpmn:SignalEventDefinition'
-	      }
-	    },
-	    {
-	      label: 'Signal end event',
-	      actionName: 'replace-with-signal-end',
-	      className: 'bpmn-icon-end-event-signal',
-	      target: {
-	        type: 'bpmn:EndEvent',
-	        eventDefinitionType: 'bpmn:SignalEventDefinition'
-	      }
-	    }
+	    replaceWith('signal-start'),
+	    replaceWith('signal-intermediate-catch'),
+	    replaceWith('signal-intermediate-throw'),
+	    replaceWith('signal-end')
 	  ],
 	  'bpmn:ErrorEventDefinition': [
-	    {
-	      label: 'Error start event',
-	      actionName: 'replace-with-error-start',
-	      className: 'bpmn-icon-start-event-error',
-	      target: {
-	        type: 'bpmn:StartEvent',
-	        eventDefinitionType: 'bpmn:ErrorEventDefinition',
-	        isInterrupting: true
-	      }
-	    },
-	    {
-	      label: 'Error end event',
-	      actionName: 'replace-with-error-end',
-	      className: 'bpmn-icon-end-event-error',
-	      target: {
-	        type: 'bpmn:EndEvent',
-	        eventDefinitionType: 'bpmn:ErrorEventDefinition'
-	      }
-	    }
+	    replaceWith('error-start'),
+	    replaceWith('error-end')
 	  ],
 	  'bpmn:EscalationEventDefinition': [
-	    {
-	      label: 'Escalation start event',
-	      actionName: 'replace-with-escalation-start',
-	      className: 'bpmn-icon-start-event-escalation',
-	      target: {
-	        type: 'bpmn:StartEvent',
-	        eventDefinitionType: 'bpmn:EscalationEventDefinition',
-	        isInterrupting: true
-	      }
-	    },
-	    {
-	      label: 'Escalation intermediate throw event',
-	      actionName: 'replace-with-escalation-intermediate-throw',
-	      className: 'bpmn-icon-intermediate-event-throw-escalation',
-	      target: {
-	        type: 'bpmn:IntermediateThrowEvent',
-	        eventDefinitionType: 'bpmn:EscalationEventDefinition'
-	      }
-	    },
-	    {
-	      label: 'Escalation end event',
-	      actionName: 'replace-with-escalation-end',
-	      className: 'bpmn-icon-end-event-escalation',
-	      target: {
-	        type: 'bpmn:EndEvent',
-	        eventDefinitionType: 'bpmn:EscalationEventDefinition'
-	      }
-	    }
+	    replaceWith('escalation-start'),
+	    replaceWith('escalation-intermediate-throw'),
+	    replaceWith('escalation-end')
 	  ],
 	  'bpmn:CompensateEventDefinition': [
-	    {
-	      label: 'Compensation start event',
-	      actionName: 'replace-with-compensation-start',
-	      className: 'bpmn-icon-start-event-compensation',
-	      target: {
-	        type: 'bpmn:StartEvent',
-	        eventDefinitionType: 'bpmn:CompensateEventDefinition',
-	        isInterrupting: true
-	      }
-	    },
-	    {
-	      label: 'Compensation intermediate throw event',
-	      actionName: 'replace-with-compensation-intermediate-throw',
-	      className: 'bpmn-icon-intermediate-event-throw-compensation',
-	      target: {
-	        type: 'bpmn:IntermediateThrowEvent',
-	        eventDefinitionType: 'bpmn:CompensateEventDefinition'
-	      }
-	    },
-	    {
-	      label: 'Compensation end event',
-	      actionName: 'replace-with-compensation-end',
-	      className: 'bpmn-icon-end-event-compensation',
-	      target: {
-	        type: 'bpmn:EndEvent',
-	        eventDefinitionType: 'bpmn:CompensateEventDefinition'
-	      }
-	    }
+	    replaceWith('compensation-start'),
+	    replaceWith('compensation-intermediate-throw'),
+	    replaceWith('compensation-end')
 	  ]
 	};
 
@@ -58483,7 +61225,7 @@
 
 	            popupMenu.open(element, 'bpmn-replace', position, {
 	              title: translate('Change element'),
-	              width: 300,
+	              width: 'var(--bpmn-replace-popup-width, 300px)',
 	              search: true
 	            });
 	          }
@@ -58623,14 +61365,14 @@
 	};
 
 	/**
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../model/Types.js').Element} Element
 	 *
-	 * @typedef {import('../../util/Types').Axis} Axis
-	 * @typedef {import('../../util/Types').Dimension} Dimension
-	 * @typedef {import('../../util/Types').Rect} Rect
+	 * @typedef {import('../../util/Types.js').Axis} Axis
+	 * @typedef {import('../../util/Types.js').Dimension} Dimension
+	 * @typedef {import('../../util/Types.js').Rect} Rect
 	 *
-	 * @typedef {import('../modeling/Modeling').default} Modeling
-	 * @typedef {import('../rules/Rules').default} Rules
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
+	 * @typedef {import('../rules/Rules.js').default} Rules
 	 *
 	 * @typedef { {
 	 *   min: number;
@@ -58866,7 +61608,7 @@
 
 	BpmnDistributeElements.$inject = [ 'eventBus' ];
 
-	e$2(BpmnDistributeElements, RuleProvider);
+	e$3(BpmnDistributeElements, RuleProvider);
 
 	BpmnDistributeElements.prototype.init = function() {
 	  this.addRule('elements.distribute', function(context) {
@@ -59020,7 +61762,7 @@
 	/**
 	 * @typedef {import('didi').Injector} Injector
 	 *
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 */
 
 	var NOT_REGISTERED_ERROR = 'is not a registered action',
@@ -59048,6 +61790,7 @@
 	 * @param {Injector} injector
 	 */
 	function EditorActions(eventBus, injector) {
+	  this._eventBus = eventBus;
 
 	  // initialize actions
 	  this._actions = {};
@@ -59218,6 +61961,15 @@
 	    throw error(action, NOT_REGISTERED_ERROR);
 	  }
 
+	  var allowed = this._eventBus.fire('editorActions.allowed', {
+	    action: action,
+	    opts: opts
+	  });
+
+	  if (allowed === false) {
+	    return;
+	  }
+
 	  return this._actions[action](opts);
 	};
 
@@ -59330,7 +62082,7 @@
 	  injector.invoke(EditorActions, this);
 	}
 
-	e$2(BpmnEditorActions, EditorActions);
+	e$3(BpmnEditorActions, EditorActions);
 
 	BpmnEditorActions.$inject = [
 	  'injector'
@@ -59531,6 +62283,249 @@
 
 	BpmnGridSnapping.$inject = [ 'eventBus' ];
 
+	/**
+	 * @typedef {import('../../../model/Types.js').Shape} Shape
+	 *
+	 * @typedef {import('../../../util/Types.js').Rect} Rect
+	 *
+	 * @typedef {import('../../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../GridSnapping.js').default} GridSnapping
+	 */
+
+	/**
+	 * Integrates resizing with grid snapping.
+	 *
+	 * @param {EventBus} eventBus
+	 * @param {GridSnapping} gridSnapping
+	 */
+	function ResizeBehavior(eventBus, gridSnapping) {
+	  CommandInterceptor.call(this, eventBus);
+
+	  this._gridSnapping = gridSnapping;
+
+	  var self = this;
+
+	  this.preExecute('shape.resize', function(event) {
+	    var context = event.context,
+	        hints = context.hints || {},
+	        autoResize = hints.autoResize;
+
+	    if (!autoResize) {
+	      return;
+	    }
+
+	    var shape = context.shape,
+	        newBounds = context.newBounds;
+
+	    if (isString(autoResize)) {
+	      context.newBounds = self.snapComplex(newBounds, autoResize);
+	    } else {
+	      context.newBounds = self.snapSimple(shape, newBounds);
+	    }
+	  });
+	}
+
+	ResizeBehavior.$inject = [
+	  'eventBus',
+	  'gridSnapping',
+	  'modeling'
+	];
+
+	e$3(ResizeBehavior, CommandInterceptor);
+
+	/**
+	 * Snap width and height in relation to center.
+	 *
+	 * @param {Shape} shape
+	 * @param {Rect} newBounds
+	 *
+	 * @return {Rect} Snapped bounds.
+	 */
+	ResizeBehavior.prototype.snapSimple = function(shape, newBounds) {
+	  var gridSnapping = this._gridSnapping;
+
+	  newBounds.width = gridSnapping.snapValue(newBounds.width, {
+	    min: newBounds.width
+	  });
+
+	  newBounds.height = gridSnapping.snapValue(newBounds.height, {
+	    min: newBounds.height
+	  });
+
+	  newBounds.x = shape.x + (shape.width / 2) - (newBounds.width / 2);
+	  newBounds.y = shape.y + (shape.height / 2) - (newBounds.height / 2);
+
+	  return newBounds;
+	};
+
+	/**
+	 * Snap x, y, width and height according to given directions.
+	 *
+	 * @param {Rect} newBounds
+	 * @param {string} directions - Directions as {n|w|s|e}.
+	 *
+	 * @return {Rect} Snapped bounds.
+	 */
+	ResizeBehavior.prototype.snapComplex = function(newBounds, directions) {
+	  if (/w|e/.test(directions)) {
+	    newBounds = this.snapHorizontally(newBounds, directions);
+	  }
+
+	  if (/n|s/.test(directions)) {
+	    newBounds = this.snapVertically(newBounds, directions);
+	  }
+
+	  return newBounds;
+	};
+
+	/**
+	 * Snap in one or both directions horizontally.
+	 *
+	 * @param {Rect} newBounds
+	 * @param {string} directions - Directions as {n|w|s|e}.
+	 *
+	 * @return {Rect} Snapped bounds.
+	 */
+	ResizeBehavior.prototype.snapHorizontally = function(newBounds, directions) {
+	  var gridSnapping = this._gridSnapping,
+	      west = /w/.test(directions),
+	      east = /e/.test(directions);
+
+	  var snappedNewBounds = {};
+
+	  snappedNewBounds.width = gridSnapping.snapValue(newBounds.width, {
+	    min: newBounds.width
+	  });
+
+	  if (east) {
+
+	    // handle <we>
+	    if (west) {
+	      snappedNewBounds.x = gridSnapping.snapValue(newBounds.x, {
+	        max: newBounds.x
+	      });
+
+	      snappedNewBounds.width += gridSnapping.snapValue(newBounds.x - snappedNewBounds.x, {
+	        min: newBounds.x - snappedNewBounds.x
+	      });
+	    }
+
+	    // handle <e>
+	    else {
+	      newBounds.x = newBounds.x + newBounds.width - snappedNewBounds.width;
+	    }
+	  }
+
+	  // assign snapped x and width
+	  assign$1(newBounds, snappedNewBounds);
+
+	  return newBounds;
+	};
+
+	/**
+	 * Snap in one or both directions vertically.
+	 *
+	 * @param {Rect} newBounds
+	 * @param {string} directions - Directions as {n|w|s|e}.
+	 *
+	 * @return {Rect} Snapped bounds.
+	 */
+	ResizeBehavior.prototype.snapVertically = function(newBounds, directions) {
+	  var gridSnapping = this._gridSnapping,
+	      north = /n/.test(directions),
+	      south = /s/.test(directions);
+
+	  var snappedNewBounds = {};
+
+	  snappedNewBounds.height = gridSnapping.snapValue(newBounds.height, {
+	    min: newBounds.height
+	  });
+
+	  if (north) {
+
+	    // handle <ns>
+	    if (south) {
+	      snappedNewBounds.y = gridSnapping.snapValue(newBounds.y, {
+	        max: newBounds.y
+	      });
+
+	      snappedNewBounds.height += gridSnapping.snapValue(newBounds.y - snappedNewBounds.y, {
+	        min: newBounds.y - snappedNewBounds.y
+	      });
+	    }
+
+	    // handle <n>
+	    else {
+	      newBounds.y = newBounds.y + newBounds.height - snappedNewBounds.height;
+	    }
+	  }
+
+	  // assign snapped y and height
+	  assign$1(newBounds, snappedNewBounds);
+
+	  return newBounds;
+	};
+
+	/**
+	 * @typedef {import('../../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../GridSnapping.js').default} GridSnapping
+	 */
+
+	var HIGH_PRIORITY$6 = 2000;
+
+	/**
+	 * Integrates space tool with grid snapping.
+	 *
+	 * @param {EventBus} eventBus
+	 * @param {GridSnapping} gridSnapping
+	 */
+	function SpaceToolBehavior(eventBus, gridSnapping) {
+	  eventBus.on([
+	    'spaceTool.move',
+	    'spaceTool.end'
+	  ], HIGH_PRIORITY$6, function(event) {
+	    var context = event.context;
+
+	    if (!context.initialized) {
+	      return;
+	    }
+
+	    var axis = context.axis;
+
+	    var snapped;
+
+	    if (axis === 'x') {
+
+	      // snap delta x to multiple of 10
+	      snapped = gridSnapping.snapValue(event.dx);
+
+	      event.x = event.x + snapped - event.dx;
+	      event.dx = snapped;
+	    } else {
+
+	      // snap delta y to multiple of 10
+	      snapped = gridSnapping.snapValue(event.dy);
+
+	      event.y = event.y + snapped - event.dy;
+	      event.dy = snapped;
+	    }
+	  });
+	}
+
+	SpaceToolBehavior.$inject = [
+	  'eventBus',
+	  'gridSnapping'
+	];
+
+	var GridSnappingBehaviorModule$1 = {
+	  __init__: [
+	    'gridSnappingResizeBehavior',
+	    'gridSnappingSpaceToolBehavior'
+	  ],
+	  gridSnappingResizeBehavior: [ 'type', ResizeBehavior ],
+	  gridSnappingSpaceToolBehavior: [ 'type', SpaceToolBehavior ]
+	};
+
 	var SPACING = 10;
 
 	function quantize(value, quantum, fn) {
@@ -59542,8 +62537,8 @@
 	}
 
 	/**
-	 * @typedef {import('../../core/ElementRegistry').default} ElementRegistry
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 */
 
 	var LOWER_PRIORITY = 1200;
@@ -59880,249 +62875,6 @@
 	}
 
 	/**
-	 * @typedef {import('../../../model/Types').Shape} Shape
-	 *
-	 * @typedef {import('../../../util/Types').Rect} Rect
-	 *
-	 * @typedef {import('../../../core/EventBus').default} EventBus
-	 * @typedef {import('../../grid-snapping/GridSnapping').default} GridSnapping
-	 */
-
-	/**
-	 * Integrates resizing with grid snapping.
-	 *
-	 * @param {EventBus} eventBus
-	 * @param {GridSnapping} gridSnapping
-	 */
-	function ResizeBehavior(eventBus, gridSnapping) {
-	  CommandInterceptor.call(this, eventBus);
-
-	  this._gridSnapping = gridSnapping;
-
-	  var self = this;
-
-	  this.preExecute('shape.resize', function(event) {
-	    var context = event.context,
-	        hints = context.hints || {},
-	        autoResize = hints.autoResize;
-
-	    if (!autoResize) {
-	      return;
-	    }
-
-	    var shape = context.shape,
-	        newBounds = context.newBounds;
-
-	    if (isString(autoResize)) {
-	      context.newBounds = self.snapComplex(newBounds, autoResize);
-	    } else {
-	      context.newBounds = self.snapSimple(shape, newBounds);
-	    }
-	  });
-	}
-
-	ResizeBehavior.$inject = [
-	  'eventBus',
-	  'gridSnapping',
-	  'modeling'
-	];
-
-	e$2(ResizeBehavior, CommandInterceptor);
-
-	/**
-	 * Snap width and height in relation to center.
-	 *
-	 * @param {Shape} shape
-	 * @param {Rect} newBounds
-	 *
-	 * @return {Rect} Snapped bounds.
-	 */
-	ResizeBehavior.prototype.snapSimple = function(shape, newBounds) {
-	  var gridSnapping = this._gridSnapping;
-
-	  newBounds.width = gridSnapping.snapValue(newBounds.width, {
-	    min: newBounds.width
-	  });
-
-	  newBounds.height = gridSnapping.snapValue(newBounds.height, {
-	    min: newBounds.height
-	  });
-
-	  newBounds.x = shape.x + (shape.width / 2) - (newBounds.width / 2);
-	  newBounds.y = shape.y + (shape.height / 2) - (newBounds.height / 2);
-
-	  return newBounds;
-	};
-
-	/**
-	 * Snap x, y, width and height according to given directions.
-	 *
-	 * @param {Rect} newBounds
-	 * @param {string} directions - Directions as {n|w|s|e}.
-	 *
-	 * @return {Rect} Snapped bounds.
-	 */
-	ResizeBehavior.prototype.snapComplex = function(newBounds, directions) {
-	  if (/w|e/.test(directions)) {
-	    newBounds = this.snapHorizontally(newBounds, directions);
-	  }
-
-	  if (/n|s/.test(directions)) {
-	    newBounds = this.snapVertically(newBounds, directions);
-	  }
-
-	  return newBounds;
-	};
-
-	/**
-	 * Snap in one or both directions horizontally.
-	 *
-	 * @param {Rect} newBounds
-	 * @param {string} directions - Directions as {n|w|s|e}.
-	 *
-	 * @return {Rect} Snapped bounds.
-	 */
-	ResizeBehavior.prototype.snapHorizontally = function(newBounds, directions) {
-	  var gridSnapping = this._gridSnapping,
-	      west = /w/.test(directions),
-	      east = /e/.test(directions);
-
-	  var snappedNewBounds = {};
-
-	  snappedNewBounds.width = gridSnapping.snapValue(newBounds.width, {
-	    min: newBounds.width
-	  });
-
-	  if (east) {
-
-	    // handle <we>
-	    if (west) {
-	      snappedNewBounds.x = gridSnapping.snapValue(newBounds.x, {
-	        max: newBounds.x
-	      });
-
-	      snappedNewBounds.width += gridSnapping.snapValue(newBounds.x - snappedNewBounds.x, {
-	        min: newBounds.x - snappedNewBounds.x
-	      });
-	    }
-
-	    // handle <e>
-	    else {
-	      newBounds.x = newBounds.x + newBounds.width - snappedNewBounds.width;
-	    }
-	  }
-
-	  // assign snapped x and width
-	  assign$1(newBounds, snappedNewBounds);
-
-	  return newBounds;
-	};
-
-	/**
-	 * Snap in one or both directions vertically.
-	 *
-	 * @param {Rect} newBounds
-	 * @param {string} directions - Directions as {n|w|s|e}.
-	 *
-	 * @return {Rect} Snapped bounds.
-	 */
-	ResizeBehavior.prototype.snapVertically = function(newBounds, directions) {
-	  var gridSnapping = this._gridSnapping,
-	      north = /n/.test(directions),
-	      south = /s/.test(directions);
-
-	  var snappedNewBounds = {};
-
-	  snappedNewBounds.height = gridSnapping.snapValue(newBounds.height, {
-	    min: newBounds.height
-	  });
-
-	  if (north) {
-
-	    // handle <ns>
-	    if (south) {
-	      snappedNewBounds.y = gridSnapping.snapValue(newBounds.y, {
-	        max: newBounds.y
-	      });
-
-	      snappedNewBounds.height += gridSnapping.snapValue(newBounds.y - snappedNewBounds.y, {
-	        min: newBounds.y - snappedNewBounds.y
-	      });
-	    }
-
-	    // handle <n>
-	    else {
-	      newBounds.y = newBounds.y + newBounds.height - snappedNewBounds.height;
-	    }
-	  }
-
-	  // assign snapped y and height
-	  assign$1(newBounds, snappedNewBounds);
-
-	  return newBounds;
-	};
-
-	/**
-	 * @typedef {import('../../../core/EventBus').default} EventBus
-	 * @typedef {import('../../grid-snapping/GridSnapping').default} GridSnapping
-	 */
-
-	var HIGH_PRIORITY$6 = 2000;
-
-	/**
-	 * Integrates space tool with grid snapping.
-	 *
-	 * @param {EventBus} eventBus
-	 * @param {GridSnapping} gridSnapping
-	 */
-	function SpaceToolBehavior(eventBus, gridSnapping) {
-	  eventBus.on([
-	    'spaceTool.move',
-	    'spaceTool.end'
-	  ], HIGH_PRIORITY$6, function(event) {
-	    var context = event.context;
-
-	    if (!context.initialized) {
-	      return;
-	    }
-
-	    var axis = context.axis;
-
-	    var snapped;
-
-	    if (axis === 'x') {
-
-	      // snap delta x to multiple of 10
-	      snapped = gridSnapping.snapValue(event.dx);
-
-	      event.x = event.x + snapped - event.dx;
-	      event.dx = snapped;
-	    } else {
-
-	      // snap delta y to multiple of 10
-	      snapped = gridSnapping.snapValue(event.dy);
-
-	      event.y = event.y + snapped - event.dy;
-	      event.dy = snapped;
-	    }
-	  });
-	}
-
-	SpaceToolBehavior.$inject = [
-	  'eventBus',
-	  'gridSnapping'
-	];
-
-	var GridSnappingBehaviorModule$1 = {
-	  __init__: [
-	    'gridSnappingResizeBehavior',
-	    'gridSnappingSpaceToolBehavior'
-	  ],
-	  gridSnappingResizeBehavior: [ 'type', ResizeBehavior ],
-	  gridSnappingSpaceToolBehavior: [ 'type', SpaceToolBehavior ]
-	};
-
-	/**
 	 * @type { import('didi').ModuleDeclaration }
 	 */
 	var GridSnappingModule$1 = {
@@ -60301,7 +63053,7 @@
 	  'modeling'
 	];
 
-	e$2(GridSnappingLayoutConnectionBehavior, CommandInterceptor);
+	e$3(GridSnappingLayoutConnectionBehavior, CommandInterceptor);
 
 	/**
 	 * Snap middle segments of a given connection.
@@ -60577,11 +63329,29 @@
 	  injector.invoke(KeyboardBindings, this);
 	}
 
-	e$2(BpmnKeyboardBindings, KeyboardBindings);
+	e$3(BpmnKeyboardBindings, KeyboardBindings);
 
 	BpmnKeyboardBindings.$inject = [
 	  'injector'
 	];
+
+
+	/**
+	 * The keyboard binding for each editor action: the `key` that triggers it,
+	 * optionally requiring the `cmd` modifier (CTRL/CMD).
+	 *
+	 * @type {Record<string, { key: string, modifier?: 'cmd' }>}
+	 */
+	var SHORTCUTS_KEY_BINDINGS = {
+	  selectElements: { key: 'A', modifier: 'cmd' },
+	  find: { key: 'F', modifier: 'cmd' },
+	  spaceTool: { key: 'S' },
+	  lassoTool: { key: 'L' },
+	  handTool: { key: 'H' },
+	  globalConnectTool: { key: 'C' },
+	  directEditing: { key: 'E' },
+	  replaceElement: { key: 'R' }
+	};
 
 
 	/**
@@ -60595,146 +63365,35 @@
 	  // inherit default bindings
 	  KeyboardBindings.prototype.registerBindings.call(this, keyboard, editorActions);
 
-	  /**
-	   * Add keyboard binding if respective editor action
-	   * is registered.
-	   *
-	   * @param {string} action name
-	   * @param {Function} fn that implements the key binding
-	   */
-	  function addListener(action, fn) {
+	  forEach(SHORTCUTS_KEY_BINDINGS, function(binding, action) {
 
-	    if (editorActions.isRegistered(action)) {
-	      keyboard.addListener(fn);
-	    }
-	  }
-
-	  // select all elements
-	  // CTRL + A
-	  addListener('selectElements', function(context) {
-
-	    var event = context.keyEvent;
-
-	    if (keyboard.isKey([ 'a', 'A' ], event) && keyboard.isCmd(event)) {
-	      editorActions.trigger('selectElements');
-
-	      return true;
-	    }
-	  });
-
-	  // search labels
-	  // CTRL + F
-	  addListener('find', function(context) {
-
-	    var event = context.keyEvent;
-
-	    if (keyboard.isKey([ 'f', 'F' ], event) && keyboard.isCmd(event)) {
-	      editorActions.trigger('find');
-
-	      return true;
-	    }
-	  });
-
-	  // activate space tool
-	  // S
-	  addListener('spaceTool', function(context) {
-
-	    var event = context.keyEvent;
-
-	    if (keyboard.hasModifier(event)) {
+	    if (!editorActions.isRegistered(action)) {
 	      return;
 	    }
 
-	    if (keyboard.isKey([ 's', 'S' ], event)) {
-	      editorActions.trigger('spaceTool');
+	    var keys = [ binding.key.toLowerCase(), binding.key.toUpperCase() ],
+	        requiresCmd = binding.modifier === 'cmd';
+
+	    keyboard.addListener(function(context) {
+
+	      var event = context.keyEvent;
+
+	      if (!keyboard.isKey(keys, event)) {
+	        return;
+	      }
+
+	      if (requiresCmd) {
+	        if (!keyboard.isCmd(event)) {
+	          return;
+	        }
+	      } else if (keyboard.hasModifier(event)) {
+	        return;
+	      }
+
+	      editorActions.trigger(action, event);
 
 	      return true;
-	    }
-	  });
-
-	  // activate lasso tool
-	  // L
-	  addListener('lassoTool', function(context) {
-
-	    var event = context.keyEvent;
-
-	    if (keyboard.hasModifier(event)) {
-	      return;
-	    }
-
-	    if (keyboard.isKey([ 'l', 'L' ], event)) {
-	      editorActions.trigger('lassoTool');
-
-	      return true;
-	    }
-	  });
-
-	  // activate hand tool
-	  // H
-	  addListener('handTool', function(context) {
-
-	    var event = context.keyEvent;
-
-	    if (keyboard.hasModifier(event)) {
-	      return;
-	    }
-
-	    if (keyboard.isKey([ 'h', 'H' ], event)) {
-	      editorActions.trigger('handTool');
-
-	      return true;
-	    }
-	  });
-
-	  // activate global connect tool
-	  // C
-	  addListener('globalConnectTool', function(context) {
-
-	    var event = context.keyEvent;
-
-	    if (keyboard.hasModifier(event)) {
-	      return;
-	    }
-
-	    if (keyboard.isKey([ 'c', 'C' ], event)) {
-	      editorActions.trigger('globalConnectTool');
-
-	      return true;
-	    }
-	  });
-
-	  // activate direct editing
-	  // E
-	  addListener('directEditing', function(context) {
-
-	    var event = context.keyEvent;
-
-	    if (keyboard.hasModifier(event)) {
-	      return;
-	    }
-
-	    if (keyboard.isKey([ 'e', 'E' ], event)) {
-	      editorActions.trigger('directEditing');
-
-	      return true;
-	    }
-	  });
-
-	  // activate replace element
-	  // R
-	  addListener('replaceElement', function(context) {
-
-	    var event = context.keyEvent;
-
-	    if (keyboard.hasModifier(event)) {
-	      return;
-	    }
-
-	    if (keyboard.isKey([ 'r', 'R' ], event)) {
-	      editorActions.trigger('replaceElement', event);
-
-	      return true;
-	    }
+	    });
 	  });
 
 	};
@@ -60748,10 +63407,10 @@
 	};
 
 	/**
-	 * @typedef {import('../keyboard/Keyboard').default} Keyboard
-	 * @typedef {import('../modeling/Modeling').default} Modeling
-	 * @typedef {import('../rules/Rules').default} Rules
-	 * @typedef {import('../selection/Selection').default} Selection
+	 * @typedef {import('../keyboard/Keyboard.js').default} Keyboard
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
+	 * @typedef {import('../rules/Rules.js').default} Rules
+	 * @typedef {import('../selection/Selection.js').default} Selection
 	 */
 
 	var DEFAULT_CONFIG = {
@@ -60768,13 +63427,9 @@
 
 	var KEY_TO_DIRECTION = {
 	  ArrowLeft: LEFT,
-	  Left: LEFT,
 	  ArrowUp: UP,
-	  Up: UP,
 	  ArrowRight: RIGHT,
-	  Right: RIGHT,
-	  ArrowDown: DOWN,
-	  Down: DOWN
+	  ArrowDown: DOWN
 	};
 
 	var DIRECTIONS_DELTA = {
@@ -60912,15 +63567,15 @@
 	};
 
 	/**
-	 * @typedef {import('../../core/Types').ShapeLike} Shape
+	 * @typedef {import('../../core/Types.js').ShapeLike} Shape
 	 *
-	 * @typedef {import('../../util/Types').Direction} Direction
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../util/Types.js').Direction} Direction
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 *
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../dragging/Dragging').default} Dragging
-	 * @typedef {import('../modeling/Modeling').default} Modeling
-	 * @typedef {import('../rules/Rules').default} Rules
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../dragging/Dragging.js').default} Dragging
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
+	 * @typedef {import('../rules/Rules.js').default} Rules
 	 */
 
 	var DEFAULT_MIN_WIDTH = 10;
@@ -61200,9 +63855,9 @@
 	var LOW_PRIORITY$4 = 500;
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../preview-support/PreviewSupport').default} PreviewSupport
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../preview-support/PreviewSupport.js').default} PreviewSupport
 	 */
 
 	/**
@@ -61281,12 +63936,12 @@
 	];
 
 	/**
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../model/Types.js').Element} Element
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../resize/Resize').default} Resize
-	 * @typedef {import('../selection/Selection').default} Selection
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('./Resize.js').default} Resize
+	 * @typedef {import('../selection/Selection.js').default} Selection
 	 */
 
 	var HANDLE_OFFSET = -6,
@@ -61371,6 +64026,7 @@
 	  attr(visual, {
 	    x: -HANDLE_SIZE / 2 + offset.x,
 	    y: -HANDLE_SIZE / 2 + offset.y,
+	    rx: 2,
 	    width: HANDLE_SIZE,
 	    height: HANDLE_SIZE
 	  });
@@ -62133,11 +64789,12 @@
 	var DEFAULT_PRIORITY$1 = 1000;
 
 	/**
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../model/Types.js').Element} Element
 	 *
-	 * @typedef {import('./OutlineProvider').default} OutlineProvider
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../../draw/Styles').default} Styles
+	 * @typedef {import('./OutlineProvider.js').default} OutlineProvider
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../../draw/Styles.js').default} Styles
 	 */
 
 	/**
@@ -62146,68 +64803,131 @@
 	 * A plugin that adds an outline to shapes and connections that may be activated and styled
 	 * via CSS classes.
 	 *
+	 * The outline is created lazily, i.e. only once an element is hovered or selected
+	 * for the first time. This keeps importing large diagrams fast, as we avoid
+	 * creating (and laying out) an outline for every single element up front.
+	 *
 	 * @param {EventBus} eventBus
 	 * @param {Styles} styles
+	 * @param {ElementRegistry} elementRegistry
 	 */
-	function Outline$1(eventBus, styles) {
+	function Outline$1(eventBus, styles, elementRegistry) {
 
 	  this._eventBus = eventBus;
+	  this._elementRegistry = elementRegistry;
 
-	  this.offset = 5;
+	  this._outlineOffset = 5;
 
-	  var OUTLINE_STYLE = styles.cls('djs-outline', [ 'no-fill' ]);
+	  this._outlineStyle = styles.cls('djs-outline', [ 'no-fill' ]);
 
 	  var self = this;
 
 	  /**
-	   * @param {SVGElement} gfx
+	   * Lazily create the outline once an element is hovered or selected.
 	   *
-	   * @return {SVGElement} outline
+	   * @param {Element} element
 	   */
-	  function createOutline(gfx) {
-	    var outline = create$1('rect');
+	  function createElementOutline(element) {
 
-	    attr(outline, assign$1({
-	      x: 0,
-	      y: 0,
-	      rx: 4,
-	      width: 100,
-	      height: 100
-	    }, OUTLINE_STYLE));
+	    // root elements have no outline; creating one would append a never-updated
+	    // rect to the untransformed root layer, polluting getActiveLayer().getBBox()
+	    if (isRoot(element)) {
+	      return;
+	    }
 
-	    return outline;
+	    self.createOutline(element);
 	  }
 
-	  // A low priortity is necessary, because outlines of labels have to be updated
-	  // after the label bounds have been updated in the renderer.
-	  eventBus.on([ 'shape.added', 'shape.changed' ], LOW_PRIORITY$3, function(event) {
-	    var element = event.element,
-	        gfx = event.gfx;
-
-	    var outline = query('.djs-outline', gfx);
-
-	    if (!outline) {
-	      outline = self.getOutline(element) || createOutline();
-	      append(gfx, outline);
-	    }
-
-	    self.updateShapeOutline(outline, element);
+	  eventBus.on('element.hover', function(event) {
+	    createElementOutline(event.element);
 	  });
 
-	  eventBus.on([ 'connection.added', 'connection.changed' ], function(event) {
+	  eventBus.on('selection.changed', function(event) {
+	    forEach(event.newSelection, createElementOutline);
+	  });
+
+	  // Keep an already created outline in sync with its element. Elements that
+	  // have not been hovered or selected yet do not have an outline; those are
+	  // created (and updated) lazily via the handlers above.
+	  //
+	  // A low priority is necessary, because outlines of labels have to be updated
+	  // after the label bounds have been updated in the renderer.
+	  eventBus.on([ 'shape.changed', 'connection.changed' ], LOW_PRIORITY$3, function(event) {
 	    var element = event.element,
 	        gfx = event.gfx;
 
 	    var outline = query('.djs-outline', gfx);
 
-	    if (!outline) {
-	      outline = createOutline();
-	      append(gfx, outline);
+	    if (outline) {
+	      self.updateOutline(element, outline);
 	    }
-
-	    self.updateConnectionOutline(outline, element);
 	  });
 	}
+
+	/**
+	 * Ensure the outline for the given element is present, creating, appending
+	 * and updating it on first access.
+	 *
+	 * Outlines are created lazily, i.e. only once an element is hovered or
+	 * selected. Use this to force outline creation, e.g. for features or tests
+	 * that rely on the outline being present.
+	 *
+	 * @param {Element} element
+	 *
+	 * @return {SVGElement} the element's outline
+	 */
+	Outline$1.prototype.createOutline = function(element) {
+	  var gfx = this._elementRegistry.getGraphics(element);
+
+	  if (!gfx) {
+	    throw new Error('cannot create outline for non-rendered element');
+	  }
+
+	  var outline = query('.djs-outline', gfx);
+
+	  if (!outline) {
+	    outline = this.getOutline(element) || this._createOutlineGfx();
+	    append(gfx, outline);
+
+	    this.updateOutline(element, outline);
+	  }
+
+	  return outline;
+	};
+
+	/**
+	 * Create the default outline graphics.
+	 *
+	 * @return {SVGElement} outline
+	 */
+	Outline$1.prototype._createOutlineGfx = function() {
+	  var outline = create$1('rect');
+
+	  attr(outline, assign$1({
+	    x: 0,
+	    y: 0,
+	    rx: 4,
+	    width: 100,
+	    height: 100
+	  }, this._outlineStyle));
+
+	  return outline;
+	};
+
+	/**
+	 * Updates the outline of the given element, dispatching to the shape or
+	 * connection specific update depending on the element type.
+	 *
+	 * @param {Element} element
+	 * @param {SVGElement} outline
+	 */
+	Outline$1.prototype.updateOutline = function(element, outline) {
+	  if (element.waypoints) {
+	    this.updateConnectionOutline(outline, element);
+	  } else {
+	    this.updateShapeOutline(outline, element);
+	  }
+	};
 
 
 	/**
@@ -62230,10 +64950,10 @@
 
 	  if (!updated) {
 	    attr(outline, {
-	      x: -this.offset,
-	      y: -this.offset,
-	      width: element.width + this.offset * 2,
-	      height: element.height + this.offset * 2
+	      x: -this._outlineOffset,
+	      y: -this._outlineOffset,
+	      width: element.width + this._outlineOffset * 2,
+	      height: element.height + this._outlineOffset * 2
 	    });
 	  }
 	};
@@ -62250,10 +64970,10 @@
 	  var bbox = getBBox(connection);
 
 	  attr(outline, {
-	    x: bbox.x - this.offset,
-	    y: bbox.y - this.offset,
-	    width: bbox.width + this.offset * 2,
-	    height: bbox.height + this.offset * 2
+	    x: bbox.x - this._outlineOffset,
+	    y: bbox.y - this._outlineOffset,
+	    width: bbox.width + this._outlineOffset * 2,
+	    height: bbox.height + this._outlineOffset * 2
 	  });
 	};
 
@@ -62316,11 +65036,11 @@
 	var SELECTION_OUTLINE_PADDING = 6;
 
 	/**
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../model/Types.js').Element} Element
 	 *
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../selection/Selection').default} Selection
-	 * @typedef {import('../../core/Canvas').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../selection/Selection.js').default} Selection
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
 	 */
 
 	/**
@@ -62452,9 +65172,9 @@
 	    if (allowedElements.length === 1) {
 	      const element = allowedElements[0];
 	      if (isLabel(element)) {
-	        createLink(element, element.labelTarget, newSelection);
+	        createLink(element, element.labelTarget);
 	      } else if (element.labels?.length) {
-	        createLink(element.labels[0], element, newSelection);
+	        createLink(element.labels[0], element);
 	      }
 	    }
 
@@ -62463,7 +65183,7 @@
 	      const label = allowedElements.find(isLabel);
 	      const target = allowedElements.find(el => el.labels?.includes(label));
 	      if (label && target) {
-	        createLink(label, target, newSelection);
+	        createLink(label, target);
 	      }
 	    }
 	  });
@@ -62475,9 +65195,9 @@
 	    }
 
 	    if (isLabel(element)) {
-	      createLink(element, element.labelTarget, selection.get());
+	      createLink(element, element.labelTarget);
 	    } else if (element.labels?.length) {
-	      createLink(element.labels[0], element, selection.get());
+	      createLink(element.labels[0], element);
 	    }
 	  });
 
@@ -62486,19 +65206,26 @@
 	   *
 	   * @param {Element} label
 	   * @param {Element} target
-	   * @param {Element[]} selection
 	   */
-	  function createLink(label, target, selection = []) {
+	  function createLink(label, target) {
 
-	    // Create an auxiliary line between label and target mid points
+	    const labelMid = getMid(label);
+
+	    // For connections, aim at the closest point on the visible connection
+	    // instead of the geometric mid point of the whole connection.
+	    const targetReference = isConnection(target)
+	      ? getReferencePoint$1(labelMid, asLines(target.waypoints))
+	      : getMid(target);
+
+	    // Create an auxiliary line between label and target reference points
 	    const line = createLine(
-	      [ getMid(target), getMid(label) ],
+	      [ targetReference, labelMid ],
 	      LINE_STYLE
 	    );
 	    const linePath = line.getAttribute('d');
 
 	    // Calculate the intersection point between line and label
-	    const labelSelected = selection.includes(label);
+	    const labelSelected = selection.isSelected(label);
 	    const labelPath = labelSelected ? getElementOutlinePath(label) : getElementPath(label);
 	    const labelInter = getElementLineIntersection(labelPath, linePath);
 
@@ -62507,12 +65234,18 @@
 	      return;
 	    }
 
-	    // Calculate the intersection point between line and label
-	    // If the target is a sequence flow, there is no intersection,
-	    // so we link to the middle of it.
-	    const targetSelected = selection.includes(target);
-	    const targetPath = targetSelected ? getElementOutlinePath(target) : getElementPath(target);
-	    const targetInter = getElementLineIntersection(targetPath, linePath) || getMid(target);
+	    // Calculate the intersection point between line and target.
+	    // For connections there is no shape to intersect, so we link to the
+	    // closest point on the connection computed above.
+	    let targetInter;
+
+	    if (isConnection(target)) {
+	      targetInter = targetReference;
+	    } else {
+	      const targetSelected = selection.isSelected(target);
+	      const targetPath = targetSelected ? getElementOutlinePath(target) : getElementPath(target);
+	      targetInter = getElementLineIntersection(targetPath, linePath) || getMid(target);
+	    }
 
 	    // Do not draw a link if the points are too close
 	    const distance = getDistancePointPoint(targetInter, labelInter);
@@ -62540,7 +65273,6 @@
 	   */
 	  function getElementOutlinePath(element) {
 	    const outlineShape = outline.getOutline(element);
-	    const outlineOffset = outline.offset;
 
 	    if (!outlineShape) {
 	      return getElementPath(element);
@@ -62558,11 +65290,13 @@
 	    }
 
 	    if (outlineShape.cx) {
+	      const radius = parseSvgNumAttr(outlineShape, 'r');
+
 	      const shape = {
-	        x: element.x - outlineOffset,
-	        y: element.y - outlineOffset,
-	        width: parseSvgNumAttr(outlineShape, 'r') * 2,
-	        height: parseSvgNumAttr(outlineShape, 'r') * 2,
+	        x: element.x + parseSvgNumAttr(outlineShape, 'cx') - radius,
+	        y: element.y + parseSvgNumAttr(outlineShape, 'cy') - radius,
+	        width: radius * 2,
+	        height: radius * 2,
 	      };
 
 	      return getCirclePath(shape);
@@ -62574,7 +65308,7 @@
 	  }
 
 	  function isElementSelected(element) {
-	    return selection.get().includes(element);
+	    return selection.isSelected(element);
 	  }
 	}
 
@@ -62610,10 +65344,10 @@
 	};
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
 	 *
-	 * @typedef {import('../../util/Types').RectTRBL} RectTRBL
+	 * @typedef {import('../../util/Types.js').RectTRBL} RectTRBL
 	 *
 	 * @typedef { {
 	 *   html: string | HTMLElement;
@@ -63057,14 +65791,14 @@
 	};
 
 	/**
-	 * @typedef {import('../../core/Types').ElementLike} Element
-	 * @typedef {import('../../core/Types').ShapeLike} Shape
+	 * @typedef {import('../../core/Types.js').ElementLike} Element
+	 * @typedef {import('../../core/Types.js').ShapeLike} Shape
 	 *
-	 * @typedef {import('../dragging/Dragging').default} Dragging
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../modeling/Modeling').default} Modeling
-	 * @typedef {import('../rules/Rules').default} Rules
-	 * @typedef {import('../selection/Selection').default} Selection
+	 * @typedef {import('../dragging/Dragging.js').default} Dragging
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../modeling/Modeling.js').default} Modeling
+	 * @typedef {import('../rules/Rules.js').default} Rules
+	 * @typedef {import('../selection/Selection.js').default} Selection
 	 */
 
 	var LOW_PRIORITY$2 = 500,
@@ -63265,7 +65999,7 @@
 
 	    var referencePoint = mid(element);
 
-	    dragging.init(event, referencePoint, 'shape.move', {
+	    var result = dragging.init(event, referencePoint, 'shape.move', {
 	      cursor: 'grabbing',
 	      autoActivate: activate,
 	      data: {
@@ -63274,8 +66008,11 @@
 	      }
 	    });
 
-	    // we've handled the event
-	    return true;
+	    // stop event propagation to avoid dragging from being handled by other
+	    // features
+	    if (result !== false) {
+	      return true;
+	    }
 	  }
 
 	  // API
@@ -63318,12 +66055,12 @@
 	}
 
 	/**
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../model/Types.js').Element} Element
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../preview-support/PreviewSupport').default} PreviewSupport
-	 * @typedef {import('../../draw/Styles').default} Styles
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../preview-support/PreviewSupport.js').default} PreviewSupport
+	 * @typedef {import('../../draw/Styles.js').default} Styles
 	 */
 
 	var LOW_PRIORITY$1 = 499;
@@ -63355,7 +66092,7 @@
 	  }
 
 	  function getAllDraggedElements(shapes) {
-	    var allShapes = selfAndAllChildren(shapes, true);
+	    var allShapes = selfAndAllChildren(shapes);
 
 	    var allConnections = allShapes.flatMap(shape =>
 	      (shape.incoming || []).concat(shape.outgoing || [])
@@ -63531,6 +66268,12 @@
 	 */
 	function removeEdges(elements) {
 
+	  var elementIds = new Set();
+
+	  elements.forEach(function(element) {
+	    elementIds.add(element.id);
+	  });
+
 	  var filteredElements = filter(elements, function(element) {
 
 	    if (!isConnection(element)) {
@@ -63538,8 +66281,8 @@
 	    } else {
 
 	      return (
-	        find(elements, matchPattern({ id: element.source.id })) &&
-	        find(elements, matchPattern({ id: element.target.id }))
+	        elementIds.has(element.source.id) &&
+	        elementIds.has(element.target.id)
 	      );
 	    }
 	  });
@@ -63573,10 +66316,151 @@
 
 	/**
 	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
+	 */
+
+	const SHOW_DELAY = 300;
+
+	/**
+	 * @typedef { import('@bpmn-io/diagram-js-ui').VNode } VNode
 	 *
-	 * @typedef {import('./PaletteProvider').PaletteEntries} PaletteEntries
-	 * @typedef {import('./PaletteProvider').default} PaletteProvider
+	 * @typedef { {
+	 *   x: number;
+	 *   y: number;
+	 *   placement?: string;
+	 * } } HoverTooltipPosition
+	 *
+	 * @typedef { {
+	 *   container: HTMLElement;
+	 *   selector: string;
+	 *   getContent: (target: HTMLElement) => VNode | null;
+	 *   getPosition: (target: HTMLElement) => HoverTooltipPosition;
+	 *   showDelay?: number;
+	 * } } HoverTooltipConfig
+	 */
+
+	/**
+	 * Shows a styled tooltip when hovering UI controls such as palette or
+	 * context pad entries. Reusable across features; a consumer registers a
+	 * hover source via #add and provides the rendered content.
+	 *
+	 * @param {Canvas} canvas
+	 */
+	function HoverTooltip(canvas) {
+	  this._canvas = canvas;
+
+	  this._mount = null;
+	  this._current = null;
+	  this._showTimer = null;
+	}
+
+	HoverTooltip.$inject = [ 'canvas' ];
+
+	/**
+	 * Register a hover source. Hovering a `selector` match inside `container`
+	 * shows a tooltip with the content and position provided by the callbacks.
+	 *
+	 * @param {HoverTooltipConfig} config
+	 */
+	HoverTooltip.prototype.add = function(config) {
+	  const {
+	    container,
+	    selector,
+	    showDelay = SHOW_DELAY
+	  } = config;
+
+	  delegate.bind(container, selector, 'mouseover',
+	    (event) => this._show(event.delegateTarget, config, showDelay));
+
+	  delegate.bind(container, selector, 'mouseout',
+	    (event) => {
+	      const { delegateTarget, relatedTarget } = event;
+
+	      // ignore transitions to a child element of the same target
+	      if (relatedTarget && delegateTarget.contains(relatedTarget)) {
+	        return;
+	      }
+
+	      this._hide();
+	    });
+	};
+
+	HoverTooltip.prototype._show = function(target, config, showDelay) {
+	  const content = config.getContent(target);
+
+	  if (!content) {
+	    return;
+	  }
+
+	  this._current = {
+	    target,
+	    content,
+	    getPosition: config.getPosition
+	  };
+
+	  clearTimeout(this._showTimer);
+
+	  this._showTimer = setTimeout(() => this._render(), showDelay);
+	};
+
+	HoverTooltip.prototype._hide = function() {
+	  clearTimeout(this._showTimer);
+
+	  this._current = null;
+
+	  this._render();
+	};
+
+	HoverTooltip.prototype._render = function() {
+	  const mount = this._getMount();
+
+	  if (!this._current) {
+	    R(null, mount);
+
+	    return;
+	  }
+
+	  const { target, content, getPosition } = this._current;
+
+	  const { x, y, placement = 'right' } = getPosition(target);
+
+	  const style = {
+	    left: `${ x }px`,
+	    top: `${ y }px`
+	  };
+
+	  R(
+	    m$1`<div
+      class="djs-hover-tooltip djs-hover-tooltip--${ placement }"
+      style=${ style }
+    >${ content }</div>`,
+	    mount
+	  );
+	};
+
+	HoverTooltip.prototype._getMount = function() {
+	  if (!this._mount) {
+	    this._mount = domify('<div class="djs-hover-tooltip-container"></div>');
+
+	    this._canvas.getContainer().appendChild(this._mount);
+	  }
+
+	  return this._mount;
+	};
+
+	/**
+	 * @type { import('didi').ModuleDeclaration }
+	 */
+	var HoverTooltipModule = {
+	  __init__: [ 'hoverTooltip' ],
+	  hoverTooltip: [ 'type', HoverTooltip ]
+	};
+
+	/**
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 *
+	 * @typedef {import('./PaletteProvider.js').PaletteEntries} PaletteEntries
+	 * @typedef {import('./PaletteProvider.js').default} PaletteProvider
 	 */
 
 	var TOGGLE_SELECTOR = '.djs-palette-toggle',
@@ -63632,7 +66516,6 @@
 	 *
 	 * @param {PaletteProvider} provider
 	 */
-
 	/**
 	 * Register a palette provider with the given priority. See
 	 * {@link PaletteProvider} for examples.
@@ -63815,7 +66698,8 @@
 	      attr$1(control, 'data-action', id);
 
 	      if (entry.title) {
-	        attr$1(control, 'title', entry.title);
+	        attr$1(control, 'aria-label', entry.title);
+	        attr$1(control, 'role', 'button');
 	      }
 
 	      if (entry.className) {
@@ -64059,24 +66943,120 @@
 	}
 
 	/**
-	 * @type { import('didi').ModuleDeclaration }
+	 * @typedef { {
+	 *   title: string;
+	 *   shortcut?: string;
+	 * } } PaletteTooltipProps
 	 */
-	var PaletteModule$1 = {
-	  __init__: [ 'palette' ],
-	  palette: [ 'type', Palette ]
+
+	/**
+	 * Renders the content of a palette entry tooltip: the entry title and,
+	 * if provided, its keyboard shortcut.
+	 *
+	 * @param {PaletteTooltipProps} props
+	 */
+	function PaletteTooltipComponent(props) {
+	  const {
+	    title,
+	    shortcut
+	  } = props;
+
+	  const shortcutNode = shortcut
+	    ? m$1`<kbd class="djs-palette-tooltip-shortcut">${ shortcut }</kbd>`
+	    : null;
+
+	  return m$1`
+    <span class="djs-palette-tooltip-label">${ title }</span>
+    ${ shortcutNode }
+  `;
+	}
+
+	/**
+	 * @typedef {import('../../core/EventBus').default} EventBus
+	 * @typedef {import('./Palette').default} Palette
+	 * @typedef {import('../hover-tooltip/HoverTooltip').default} HoverTooltip
+	 */
+
+	const PALETTE_ENTRY_SELECTOR = '.djs-palette-entries .entry';
+
+	const ENTRY_GAP = 8;
+
+	/**
+	 * Shows a hover tooltip for palette entries, displaying the entry `title`
+	 * and, if the entry provides one, its keyboard `shortcut`.
+	 *
+	 * @param {EventBus} eventBus
+	 * @param {Palette} palette
+	 * @param {HoverTooltip} hoverTooltip
+	 */
+	function PaletteTooltip(eventBus, palette, hoverTooltip) {
+	  this._palette = palette;
+	  this._hoverTooltip = hoverTooltip;
+
+	  this._entries = {};
+
+	  eventBus.on('palette.create', (event) => this._init(event.container));
+
+	  eventBus.on('palette.changed', () => this._updateEntries());
+	}
+
+	PaletteTooltip.$inject = [ 'eventBus', 'palette', 'hoverTooltip' ];
+
+	PaletteTooltip.prototype._init = function(container) {
+	  this._updateEntries();
+
+	  this._hoverTooltip.add({
+	    container,
+	    selector: PALETTE_ENTRY_SELECTOR,
+	    getContent: (target) => {
+	      const entry = this._entries[ attr$1(target, 'data-action') ];
+
+	      if (!entry || !entry.title) {
+	        return null;
+	      }
+
+	      return m$1`<${PaletteTooltipComponent}
+        title=${ entry.title }
+        shortcut=${ entry.shortcut }
+      />`;
+	    },
+	    getPosition: (target) => {
+	      const bounds = target.getBoundingClientRect();
+
+	      return {
+	        x: bounds.right + ENTRY_GAP,
+	        y: bounds.top + bounds.height / 2,
+	        placement: 'right'
+	      };
+	    }
+	  });
+	};
+
+	PaletteTooltip.prototype._updateEntries = function() {
+	  this._entries = this._palette.getEntries();
 	};
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../dragging/Dragging').default} Dragging
-	 * @typedef {import('../../core/ElementRegistry').default} ElementRegistry
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../mouse/Mouse').default} Mouse
-	 * @typedef {import('../selection/Selection').default} Selection
-	 * @typedef {import('../tool-manager/ToolManager').default} ToolManager
+	 * @type { import('didi').ModuleDeclaration }
+	 */
+	var PaletteModule$1 = {
+	  __depends__: [ HoverTooltipModule ],
+	  __init__: [ 'palette', 'paletteTooltip' ],
+	  palette: [ 'type', Palette ],
+	  paletteTooltip: [ 'type', PaletteTooltip ]
+	};
+
+	/**
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../dragging/Dragging.js').default} Dragging
+	 * @typedef {import('../../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../mouse/Mouse.js').default} Mouse
+	 * @typedef {import('../selection/Selection.js').default} Selection
+	 * @typedef {import('../tool-manager/ToolManager.js').default} ToolManager
 	 *
-	 * @typedef {import('../../util/Types').Rect} Rect
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../util/Types.js').Rect} Rect
+	 * @typedef {import('../../model/Types.js').Element} Element
 	 *
 	 * @typedef { {
 	 *   add?: boolean,
@@ -64490,11 +67470,11 @@
 	/**
 	 * @typedef {import('didi').Injector} Injector
 	 *
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../dragging/Dragging').default} Dragging
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../mouse/Mouse').default} Mouse
-	 * @typedef {import('../tool-manager/ToolManager').default} ToolManager
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../dragging/Dragging.js').default} Dragging
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../mouse/Mouse.js').default} Mouse
+	 * @typedef {import('../tool-manager/ToolManager.js').default} ToolManager
 	 */
 
 	var HIGH_PRIORITY$1 = 1500;
@@ -64685,15 +67665,15 @@
 	    MARKER_NOT_OK = 'connect-not-ok';
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../connect/Connect').default} Connect
-	 * @typedef {import('../dragging/Dragging').default} Dragging
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../mouse/Mouse').default} Mouse
-	 * @typedef {import('../rules/Rules').default} Rules
-	 * @typedef {import('../tool-manager/ToolManager').default} ToolManager
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../connect/Connect.js').default} Connect
+	 * @typedef {import('../dragging/Dragging.js').default} Dragging
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../mouse/Mouse.js').default} Mouse
+	 * @typedef {import('../rules/Rules.js').default} Rules
+	 * @typedef {import('../tool-manager/ToolManager.js').default} ToolManager
 	 *
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../model/Types.js').Element} Element
 	 */
 
 	/**
@@ -64957,6 +67937,7 @@
 	      group: 'tools',
 	      className: 'bpmn-icon-hand-tool',
 	      title: translate('Activate hand tool'),
+	      shortcut: SHORTCUTS_KEY_BINDINGS.handTool.key,
 	      action: {
 	        click: function(event) {
 	          handTool.activateHand(event);
@@ -64967,6 +67948,7 @@
 	      group: 'tools',
 	      className: 'bpmn-icon-lasso-tool',
 	      title: translate('Activate lasso tool'),
+	      shortcut: SHORTCUTS_KEY_BINDINGS.lassoTool.key,
 	      action: {
 	        click: function(event) {
 	          lassoTool.activateSelection(event);
@@ -64977,6 +67959,7 @@
 	      group: 'tools',
 	      className: 'bpmn-icon-space-tool',
 	      title: translate('Activate create/remove space tool'),
+	      shortcut: SHORTCUTS_KEY_BINDINGS.spaceTool.key,
 	      action: {
 	        click: function(event) {
 	          spaceTool.activateSelection(event);
@@ -64987,6 +67970,7 @@
 	      group: 'tools',
 	      className: 'bpmn-icon-connection-multi',
 	      title: translate('Activate global connect tool'),
+	      shortcut: SHORTCUTS_KEY_BINDINGS.globalConnectTool.key,
 	      action: {
 	        click: function(event) {
 	          globalConnect.start(event);
@@ -65186,7 +68170,7 @@
 	  'previewSupport'
 	];
 
-	e$2(BpmnReplacePreview, CommandInterceptor);
+	e$3(BpmnReplacePreview, CommandInterceptor);
 
 	var ReplacePreviewModule = {
 	  __depends__: [
@@ -65441,11 +68425,11 @@
 	}
 
 	/**
-	 * @typedef {import('../../model/Types').Element} Element
+	 * @typedef {import('../../model/Types.js').Element} Element
 	 *
-	 * @typedef {import('../../util/Types').Axis} Axis
-	 * @typedef {import('../../util/Types').DirectionTRBL} DirectionTRBL
-	 * @typedef {import('../../util/Types').Point} Point
+	 * @typedef {import('../../util/Types.js').Axis} Axis
+	 * @typedef {import('../../util/Types.js').DirectionTRBL} DirectionTRBL
+	 * @typedef {import('../../util/Types.js').Point} Point
 	 *
 	 * @typedef {DirectionTRBL & 'mid'} SnapLocation
 	 */
@@ -65640,9 +68624,9 @@
 	};
 
 	/**
-	 * @typedef {import('../../core/ElementRegistry').default} ElementRegistry
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('./Snapping').default} Snapping
+	 * @typedef {import('../../core/ElementRegistry.js').default} ElementRegistry
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('./Snapping.js').default} Snapping
 	 */
 
 	var HIGHER_PRIORITY$1 = 1250;
@@ -65877,7 +68861,7 @@
 	  });
 	}
 
-	e$2(BpmnCreateMoveSnapping, CreateMoveSnapping);
+	e$3(BpmnCreateMoveSnapping, CreateMoveSnapping);
 
 	BpmnCreateMoveSnapping.$inject = [
 	  'eventBus',
@@ -66097,8 +69081,8 @@
 	}
 
 	/**
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('./Snapping').default} Snapping
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('./Snapping.js').default} Snapping
 	 */
 
 	var HIGHER_PRIORITY = 1250;
@@ -66249,11 +69233,11 @@
 	}
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
 	 *
-	 * @typedef {import('../../core/EventBus').Event} Event
+	 * @typedef {import('../../core/EventBus.js').Event} Event
 	 *
-	 * @typedef {import('./SnapContext').SnapPoints} SnapPoints
+	 * @typedef {import('./SnapContext.js').SnapPoints} SnapPoints
 	 */
 
 	var SNAP_TOLERANCE = 7;
@@ -66425,16 +69409,16 @@
 	};
 
 	/**
-	 * @typedef {import('../../core/Canvas').default} Canvas
-	 * @typedef {import('../../core/EventBus').default} EventBus
-	 * @typedef {import('../selection/Selection').default} Selection
+	 * @typedef {import('../../core/Canvas.js').default} Canvas
+	 * @typedef {import('../../core/EventBus.js').default} EventBus
+	 * @typedef {import('../selection/Selection.js').default} Selection
 	 * @typedef {import('../../i18n/translate/translate.js').default} Translate
 	 *
-	 * @typedef {import('../../util/Types').Dimensions} Dimensions
+	 * @typedef {import('../../util/Types.js').Dimensions} Dimensions
 	 *
-	 * @typedef {import('./SearchPadProvider').default} SearchPadProvider
-	 * @typedef {import('./SearchPadProvider').SearchResult} SearchResult
-	 * @typedef {import('./SearchPadProvider').Token} Token
+	 * @typedef {import('./SearchPadProvider.js').default} SearchPadProvider
+	 * @typedef {import('./SearchPadProvider.js').SearchResult} SearchResult
+	 * @typedef {import('./SearchPadProvider.js').Token} Token
 	 */
 
 	var SCROLL_TO_ELEMENT_PADDING = 300;
@@ -67397,7 +70381,7 @@
 	  BaseModeler.call(this, options);
 	}
 
-	e$2(Modeler, BaseModeler);
+	e$3(Modeler, BaseModeler);
 
 
 	Modeler.Viewer = Viewer;
@@ -67418,6 +70402,7 @@
 	Modeler.prototype._interactionModules = [
 
 	  // non-modeling components
+	  KeepSelectionVisibleModule,
 	  KeyboardMoveModule,
 	  MoveCanvasModule,
 	  ZoomScrollModule

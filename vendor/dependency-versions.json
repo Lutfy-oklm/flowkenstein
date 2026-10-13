@@ -1,0 +1,9 @@
+{
+  "bpmnJs": "18.31.0",
+  "source": "https://registry.npmjs.org/bpmn-js/18.31.0",
+  "integrity": "sha512-tGc6spNXC81858FXhk0NI9+CjfsPYDmKWSyiq0u2Rhk9J8l+DJtzZK1CYj4fqcek026PQDEwwUQwsr2Opfec/w==",
+  "patches": [
+    "WHITEBOARD_FRAME_PACING",
+    "PROCESSIA_SYNC_SAVE"
+  ]
+}
