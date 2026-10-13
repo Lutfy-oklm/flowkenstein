@@ -68976,9 +68976,9 @@ $('larger-shape').onclick=()=>{if(sizableShape(selected))resizeSelected(Math.rou
 editor.on('shape.changed',event=>{if(event.element===selected&&$('properties').style.display==='block')updateSizeFields();});
 editor.on('element.dblclick',2000,event=>{const el=event.element;if(el.type!=='bpmn:Lane'&&!(el.type==='bpmn:Participant'&&el.businessObject.processRef))return;actorToRename=el;$('actor-title').textContent=el.type==='bpmn:Lane'?'Nom de l’acteur':'Nom de l’organisation';$('actor-name').value=el.businessObject.name||'';$('actor-dialog').showModal();$('actor-name').focus();$('actor-name').select();return false;});
 $('cancel-actor').onclick=()=>$('actor-dialog').close();$('actor-form').onsubmit=event=>{event.preventDefault();if(actorToRename)editor.get('modeling').updateProperties(actorToRename,{name:$('actor-name').value.trim()});$('actor-dialog').close();};
-function keepActorColumnClear(){
+function keepActorColumnClear(container){
  const registry=editor.get('elementRegistry'),modeling=editor.get('modeling');
- registry.getAll().filter(el=>el.type==='bpmn:Participant'&&el.businessObject.processRef).forEach(pool=>{
+ (container?[container]:registry.getAll().filter(el=>el.type==='bpmn:Participant'&&el.businessObject.processRef)).forEach(pool=>{
   const lanes=(pool.children||[]).filter(el=>el.type==='bpmn:Lane');if(!lanes.length)return;
   const nodes=(pool.children||[]).filter(el=>!el.labelTarget&&!el.host&&el.businessObject?.$instanceOf('bpmn:FlowNode'));
   if(!nodes.length)return;const minimum=Math.min(...lanes.map(lane=>lane.x))+184,left=Math.min(...nodes.map(node=>node.x));
@@ -69100,9 +69100,21 @@ function starterXML(){
 }
 async function createStarter(){await editor.importXML(starterXML());keepActorColumnClear();}
 function targetPool(){
+ const canvas=editor.get('canvas'),root=canvas.getRootElement();
+ if(root.businessObject?.$instanceOf('bpmn:SubProcess'))return root;
  let current=selected?.labelTarget||selected;
- while(current){if(current.type==='bpmn:Participant'&&current.businessObject.processRef)return current;current=current.parent;}
- return editor.get('elementRegistry').getAll().find(el=>el.type==='bpmn:Participant'&&el.businessObject.processRef);
+ while(current){if(current.type==='bpmn:Participant'&&current.businessObject.processRef&&canvas.findRoot(current)===root)return current;current=current.parent;}
+ return editor.get('elementRegistry').getAll().find(el=>el.type==='bpmn:Participant'&&el.businessObject.processRef&&canvas.findRoot(el)===root);
+}
+function createFirstSubprocessLane(root){
+ const canvas=editor.get('canvas'),nodes=(root.children||[]).filter(el=>!el.waypoints&&!el.labelTarget&&el.type!=='bpmn:Group'&&el.type!=='bpmn:Lane'&&Number.isFinite(el.x)&&Number.isFinite(el.y));
+ const box=canvas.viewbox(),width=nodes.length?Math.max(1200,Math.max(...nodes.map(el=>el.x+el.width))-Math.min(...nodes.map(el=>el.x))+264):1200;
+ const left=nodes.length?Math.min(...nodes.map(el=>el.x))-184:box.x+box.width/2-width/2;
+ const top=nodes.length?Math.min(...nodes.map(el=>el.y))-40:box.y+box.height/2-90;
+ const height=nodes.length?Math.max(180,Math.max(...nodes.map(el=>el.y+el.height))-top+40):180;
+ const businessObject=editor.get('bpmnFactory').create('bpmn:Lane',{name:'Acteur 1'});
+ const shape=editor.get('elementFactory').createShape({type:'bpmn:Lane',isHorizontal:true,businessObject,width,height});
+ return editor.get('modeling').createShape(shape,{x:left+width/2,y:top+height/2},root,{autoResize:false});
 }
 function createPoolAroundDiagram(){
  const canvas=editor.get('canvas'),root=canvas.getRootElement(),nodes=(root.children||[]).filter(el=>!el.waypoints&&!el.labelTarget&&el.type!=='bpmn:Group');
@@ -69118,11 +69130,11 @@ $('add-lane').onclick=()=>{
  try{
   const modeling=editor.get('modeling');let pool=targetPool()||createPoolAroundDiagram();
   let lanes=(pool.children||[]).filter(el=>el.type==='bpmn:Lane').sort((a,b)=>a.y-b.y);
-  const lane=modeling.addLane(lanes.at(-1)||pool,'bottom');
+  const lane=!lanes.length&&pool.businessObject?.$instanceOf('bpmn:SubProcess')?createFirstSubprocessLane(pool):modeling.addLane(lanes.at(-1)||pool,'bottom');
   lanes=(pool.children||[]).filter(el=>el.type==='bpmn:Lane').sort((a,b)=>a.y-b.y);
   lanes.forEach((el,index)=>{if(!el.businessObject.name)modeling.updateProperties(el,{name:'Acteur '+(index+1)});});
   editor.get('eventBus').fire('elements.changed',{elements:lanes});
-  keepActorColumnClear();editor.get('selection').select(lane);fit();notify('Couloir ajouté. Double-cliquez sur son nom pour le renommer.');
+  keepActorColumnClear(pool);editor.get('selection').select(lane);fit();notify('Couloir ajouté. Double-cliquez sur son nom pour le renommer.');
  }catch(error){notify('Ajout impossible : '+error.message);}
 };
 function cancelSave(){clearTimeout(timer);timer=null;if(idleSave!==null&&window.cancelIdleCallback)window.cancelIdleCallback(idleSave);idleSave=null;}
