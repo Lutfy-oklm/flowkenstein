@@ -38,3 +38,9 @@ automatiquement une mise à jour via l’intégration GitHub de Vercel.
 
 Le code original de Flowkenstein est sous licence MIT. La bibliothèque bpmn-js conserve
 sa licence (vendor/LICENSE-bpmn-js.txt), qui impose l’affichage de son logo.
+
+## Sécurité
+
+Bibliothèque bpmn-js 18.31.0. Import BPMN standard contrôlé avant ouverture : DTD, entités, extensions actives, dimensions anormales et complexité excessive sont refusées. Les données restent dans le navigateur.
+
+Sur Vercel, les en-têtes bloquent les scripts non autorisés, les connexions réseau de l’éditeur et l’intégration en iframe. Les empreintes des scripts sont recalculées par scripts/security.cjs après chaque build.
