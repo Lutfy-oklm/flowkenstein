@@ -9,6 +9,8 @@ html=html.replace('<!--LIBRARY_STYLES-->',()=>'<style>'+css+'</style>');
 const lib=fs.readFileSync('vendor/bpmn-modeler.js','utf8').replace(/<\/script/gi,'<\\/script');
 html=html.replace('<!--LIBRARY_SCRIPT-->',()=>'<script>'+lib+'</script>');
 fs.writeFileSync('public/atelier.html',html);
+// Alias pour les liens historiques et les copies locales.
+fs.writeFileSync('public/Processia.html',html);
 const home=fs.readFileSync('src/home.html','utf8').replaceAll('<!--LOGO_DATA-->','data:image/svg+xml;base64,'+fs.readFileSync('public/Flowkenstein-logo.svg').toString('base64'));
 fs.writeFileSync('public/index.html',home);
 
