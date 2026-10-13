@@ -34,7 +34,7 @@ Les dépendances de l’éditeur sont incluses dans `vendor/`. Le build ne tél�
 
 ## Déploiement
 
-Vercel sert directement `public/`, sans compilation sur le serveur. Après une modification des sources, exécutez le build puis publiez aussi les fichiers générés et `vercel.json`. Les anciennes adresses `/Processia` et `/Processia.html` sont conservées uniquement comme redirections vers `/atelier`.
+Vercel sert directement `public/`, sans compilation sur le serveur. Après une modification des sources, exécutez le build puis publiez aussi les fichiers générés et `vercel.json`. Deux fichiers historiques, `public/Processia.html` et `public/Processia-icone.svg`, sont conservés uniquement pour la compatibilité. Ils affichent la marque Flowkenstein. Les anciennes adresses `/Processia` et `/Processia.html` sont conservées uniquement comme redirections vers `/atelier`.
 
 ## Fonctionnalités
 
