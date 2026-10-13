@@ -68844,10 +68844,63 @@ SafeLaneWidth.prototype.preExecute=function(context){
 };
 SafeLaneWidth.prototype.execute=function(){return[];};SafeLaneWidth.prototype.revert=function(){return[];};
 laneStack.registerHandler('lanes.safeWidth',SafeLaneWidth);
+function snapshotLaneConnections(){
+ return editor.get('elementRegistry').getAll().filter(el=>el.waypoints&&!el.labelTarget&&el.source&&el.target).map(connection=>({connection,source:elementBounds(connection.source),target:elementBounds(connection.target),points:copyPoints(connection.waypoints),label:connection.label?elementBounds(connection.label):null}));
+}
+function resizedAnchorDelta(element,before,point){
+ return{x:element.x-before.x+(before.width?(point.x-before.x)*(element.width-before.width)/before.width:0),y:element.y-before.y+(before.height?(point.y-before.y)*(element.height-before.height)/before.height:0)};
+}
+function laneConnectionPoints(saved){
+ const original=saved.points,connection=saved.connection;if(original.length<2)return copyPoints(original);
+ const start=resizedAnchorDelta(connection.source,saved.source,original[0]),end=resizedAnchorDelta(connection.target,saved.target,original.at(-1));
+ const points=copyPoints(original),lengths=[0];
+ for(let i=1;i<points.length;i++)lengths.push(lengths[i-1]+Math.hypot(original[i].x-original[i-1].x,original[i].y-original[i-1].y));
+ const total=lengths.at(-1)||1;
+ for(const axis of ['x','y']){
+  for(let first=0;first<points.length;){
+   let last=first;while(last+1<points.length&&Math.abs(original[last+1][axis]-original[first][axis])<0.001)last++;
+   if(first===0&&last===points.length-1&&Math.abs(start[axis]-end[axis])>0.001)return null;
+   const fraction=(lengths[first]+lengths[last])/(2*total);
+   const delta=first===0?start[axis]:last===points.length-1?end[axis]:start[axis]+(end[axis]-start[axis])*fraction;
+   for(let i=first;i<=last;i++){points[i][axis]+=delta;if(points[i].original)points[i].original[axis]+=delta;}
+   first=last+1;
+  }
+ }
+ return points;
+}
+function laneLabelPosition(saved,points){
+ const center={x:saved.label.x+saved.label.width/2,y:saved.label.y+saved.label.height/2};
+ let best=null;
+ for(let i=1;i<saved.points.length;i++){
+  const a=saved.points[i-1],b=saved.points[i],dx=b.x-a.x,dy=b.y-a.y,length=dx*dx+dy*dy;
+  const t=length?Math.max(0,Math.min(1,((center.x-a.x)*dx+(center.y-a.y)*dy)/length)):0;
+  const old={x:a.x+t*dx,y:a.y+t*dy},distance=(center.x-old.x)**2+(center.y-old.y)**2;
+  if(!best||distance<best.distance){const na=points[i-1],nb=points[i];best={distance,x:saved.label.x+na.x+t*(nb.x-na.x)-old.x,y:saved.label.y+na.y+t*(nb.y-na.y)-old.y};}
+ }
+ return best||saved.label;
+}
+function restoreLaneConnections(snapshots){
+ snapshots.forEach(saved=>{
+  const connection=saved.connection;let points=laneConnectionPoints(saved);
+  if(points){
+   if(JSON.stringify(connection.waypoints)!==JSON.stringify(points))laneModeling.updateWaypoints(connection,points,{labelBehavior:false});
+  }else{
+   // A formerly straight line may need a bend if its two ends move differently.
+   const first=saved.points[0],last=saved.points.at(-1),a=resizedAnchorDelta(connection.source,saved.source,first),b=resizedAnchorDelta(connection.target,saved.target,last);
+   laneModeling.layoutConnection(connection,{connectionStart:{x:first.x+a.x,y:first.y+a.y},connectionEnd:{x:last.x+b.x,y:last.y+b.y}});
+  }
+  if(saved.label&&connection.label){
+   const label=points?laneLabelPosition(saved,points):{x:saved.label.x+((connection.source.x-saved.source.x)+(connection.target.x-saved.target.x))/2,y:saved.label.y+((connection.source.y-saved.source.y)+(connection.target.y-saved.target.y))/2};
+   const delta={x:label.x-connection.label.x,y:label.y-connection.label.y};
+   if(delta.x||delta.y)laneModeling.moveShape(connection.label,delta,null,{recurse:false,layout:false,autoResize:false});
+  }
+ });
+}
 function UniformLanes(){}
 UniformLanes.prototype.preExecute=function(context){
  equalizingLanes=true;
  try{
+  const connections=snapshotLaneConnections();
   if(context.add){context.newLane=originalLaneAdd(context.target,context.location);context.parent=context.newLane.parent;}
   let lanes=(context.parent?.children||[]).filter(el=>el.type==='bpmn:Lane').sort((a,b)=>a.y-b.y);
   if(!lanes.length)return;
@@ -68860,6 +68913,8 @@ UniformLanes.prototype.preExecute=function(context){
    const shape=context.shape;laneStack.execute('lanes.safeWidth',{shape,bounds:{x:context.bounds.x,y:shape.y,width:context.bounds.width,height:shape.height},balanced:false});
   }
   lanes.forEach(lane=>{if(Math.abs(lane.height-height)>0.5)originalLaneResize(lane,{x:lane.x,y:lane.y,width:lane.width,height},false);});
+  // Repair after every lane has reached its final position, once per undo unit.
+  restoreLaneConnections(connections);
   lanes.forEach((lane,index)=>{if(!lane.businessObject.name)laneModeling.updateProperties(lane,{name:'Acteur '+(index+1)});});
  }finally{equalizingLanes=false;}
 };
