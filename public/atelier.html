@@ -68782,7 +68782,8 @@ function frenchTranslate(template,replacements={}){
  }
  return label(template).replace(/\{([^}]+)\}/g,(match,key)=>replacements[key]===undefined?match:String(replacements[key]));
 }
-const editor=new BpmnJS({container:'#canvas',additionalModules:[{translate:['value',frenchTranslate]},{__init__:['pdfDesign'],pdfDesign:['type',PdfDesign]}],bpmnRenderer:{defaultFillColor:'#ffffff',defaultStrokeColor:'#00868d',defaultLabelColor:'#142f49'},gridSnapping:{active:false},canvas:{deferUpdate:true},textRenderer:{defaultStyle:{fontFamily:'Arial, sans-serif',fontSize:12},externalStyle:{fontFamily:'Arial, sans-serif',fontSize:12}}});
+function PreserveLaneHeight(){}
+const editor=new BpmnJS({container:'#canvas',additionalModules:[{translate:['value',frenchTranslate]},{__init__:['pdfDesign'],pdfDesign:['type',PdfDesign],deleteLaneBehavior:['type',PreserveLaneHeight]}],bpmnRenderer:{defaultFillColor:'#ffffff',defaultStrokeColor:'#00868d',defaultLabelColor:'#142f49'},gridSnapping:{active:false},canvas:{deferUpdate:true},textRenderer:{defaultStyle:{fontFamily:'Arial, sans-serif',fontSize:12},externalStyle:{fontFamily:'Arial, sans-serif',fontSize:12}}});
 function closeFileMenu(){$('file-menu').hidden=true;$('menu-toggle').setAttribute('aria-expanded','false');}
 $('menu-toggle').onclick=()=>{const open=$('file-menu').hidden;$('file-menu').hidden=!open;$('menu-toggle').setAttribute('aria-expanded',String(open));$('extra-tools').hidden=true;};
 $('file-menu').addEventListener('click',event=>{if(event.target.closest('button'))closeFileMenu();});
@@ -68952,6 +68953,34 @@ function synchronizeAutomaticLanes(context){
 }
 // Run after native auto-expansion, inside the original move/create/resize undo unit.
 editor.on(['commandStack.elements.move.postExecuted','commandStack.shape.create.postExecuted','commandStack.shape.resize.postExecuted','commandStack.shape.toggleCollapse.postExecuted'],50,event=>synchronizeAutomaticLanes(event.context));
+function captureLaneDeletion(context){
+ const lane=context.shape;if(lane?.type!=='bpmn:Lane'||context.hints?.nested||!lane.parent)return;
+ const parent=lane.parent,siblings=(parent.children||[]).filter(el=>el.type==='bpmn:Lane'&&el!==lane);
+ if(!siblings.length)return;
+ context.compactLane={parent,parentBounds:elementBounds(parent),removed:elementBounds(lane),siblings:siblings.map(shape=>({shape,bounds:elementBounds(shape)})),nodes:(parent.children||[]).filter(el=>el.type!=='bpmn:Lane'&&!el.waypoints&&Number.isFinite(el.x)&&Number.isFinite(el.y)).map(shape=>({shape,bounds:elementBounds(shape)})),connections:snapshotLaneConnections()};
+}
+function compactDeletedLane(context){
+ const saved=context.compactLane;if(!saved)return;
+ const registry=editor.get('elementRegistry'),remaining=saved.siblings.filter(item=>registry.get(item.shape.id));
+ if(!remaining.length)return;
+ const previous=equalizingLanes;equalizingLanes=true;
+ try{
+  const after=bounds=>bounds.y>=saved.removed.y+saved.removed.height-0.5;
+  // Shrink the enclosing pool instead of handing the deleted height to its neighbour.
+  if(Number.isFinite(saved.parentBounds.height)&&saved.parentBounds.height>saved.removed.height){
+   laneModeling.resizeShape(saved.parent,{...saved.parentBounds,height:saved.parentBounds.height-saved.removed.height},null,{autoResize:false});
+  }
+  remaining.forEach(({shape,bounds})=>laneModeling.resizeShape(shape,{...bounds,y:bounds.y-(after(bounds)?saved.removed.height:0)},null,{autoResize:false}));
+  saved.nodes.forEach(({shape,bounds})=>{
+   if(!registry.get(shape.id))return;
+   const y=bounds.y-(after(bounds)?saved.removed.height:0),delta={x:bounds.x-shape.x,y:y-shape.y};
+   if(delta.x||delta.y)laneModeling.moveShape(shape,delta,null,{recurse:false,layout:false,autoResize:false});
+  });
+  restoreLaneConnections(saved.connections.filter(item=>registry.get(item.connection.id)&&item.connection.source?.parent&&item.connection.target?.parent));
+ }finally{equalizingLanes=previous;}
+}
+editor.on('commandStack.shape.delete.preExecute',1500,event=>captureLaneDeletion(event.context));
+editor.on('commandStack.shape.delete.postExecuted',500,event=>compactDeletedLane(event.context));
 let actorToRename=null;
 function sizableShape(el){return !!el&&!el.labelTarget&&!el.waypoints&&!!el.businessObject&&(el.businessObject.$instanceOf('bpmn:Activity')||el.businessObject.$instanceOf('bpmn:Event')||el.businessObject.$instanceOf('bpmn:Gateway'));}
 function roundShape(el){return el.businessObject.$instanceOf('bpmn:Event')||el.businessObject.$instanceOf('bpmn:Gateway');}
