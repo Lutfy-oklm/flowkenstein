@@ -46,7 +46,7 @@ function englishHome(source){
  return englishLinks(html);
 }
 function englishPage(name,source){const page=pages[name];if(!page)throw Error('Missing English page: '+name);
- const main=`<main class="legal-main"><a class="back" href="index.html">← Back to home</a><h1>${page.title}</h1><p class="lead">${page.lead}</p><p class="updated">Last updated: 13 October 2026</p>${page.body}</main>`;
+ const main=`<main class="legal-main"><a class="back" href="index.html">← Back to home</a><h1>${page.title}</h1><p class="lead">${page.lead}</p><p class="updated">Last updated: ${page.updated||'13 October 2026'}</p>${page.body}</main>`;
  let html=translateMarkup(source.replace(/<main\b[\s\S]*?<\/main>/,main)).replace('lang="fr"','lang="en"');
  html=html.replace(/<title>[\s\S]*?<\/title>/,`<title>${page.title} — Flowkenstein</title>`).replace(/<meta name="description" content="[^"]*">/,`<meta name="description" content="${page.lead}">`);
  return englishLinks(html);
