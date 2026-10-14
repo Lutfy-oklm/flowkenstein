@@ -206,7 +206,10 @@
     "Ctrl+Maj+E": "Ctrl+Shift+E",
     "○ → Votre idée": "○ → Your idea",
     "Votre processus → ◇": "Your process → ◇",
-    "Ouvrir le tableau ↗": "Open the canvas ↗"
+    "Ouvrir le tableau ↗": "Open the canvas ↗",
+    "Récupérer une sauvegarde": "Recover a saved diagram",
+    "Diagramme récupéré": "Recovered diagram",
+    "La sauvegarde n’a pas pu être ouverte. Une copie est disponible dans le menu.": "The saved diagram could not be opened. A recovery copy is available in the menu."
   },
   "pages": {
     "mentions-legales.html": {
