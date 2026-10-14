@@ -211,7 +211,7 @@
     "Diagramme récupéré": "Recovered diagram",
     "La sauvegarde n’a pas pu être ouverte. Une copie est disponible dans le menu.": "The saved diagram could not be opened. A recovery copy is available in the menu.",
     "Donnez vie": "Bring your",
-    "à vos processus.": "processes to life.",
+    "à vos processus.": "to life.",
     "Le tableau BPMN 2.0 gratuit et open source.": "The free, open-source BPMN 2.0 canvas.",
     "Entrer dans l’atelier": "Enter the workshop",
     "Sans compte. Vos diagrammes restent sur votre appareil.": "No account needed. Your diagrams stay on your device.",
@@ -248,7 +248,10 @@
     "Les pièces sont prêtes. Le prochain processus est le vôtre.": "The pieces are ready. The next process is yours.",
     "Atelier BPMN": "BPMN workshop",
     "Un atelier BPMN gratuit et open source.": "A free, open-source BPMN workshop.",
-    "+ Couloir": "+ Lane"
+    "+ Couloir": "+ Lane",
+    "L’atelier des idées bien reliées": "The workshop for well-connected ideas",
+    "Donnez": "Bring your",
+    "vie": "processes"
   },
   "pages": {
     "mentions-legales.html": {
