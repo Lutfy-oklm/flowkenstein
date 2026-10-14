@@ -22,7 +22,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'none'; script-src 'sha256-YC2Ff6G7FT4VFc+QnDyRhLsnvc2yhb8372JiVnnh5B8=' 'sha256-2nK3/FAIqUE+8ZVTTpFOKhOKHaQs/7GROKxTCoNSn6E=' 'sha256-+rC6og53sLMjD+Fw+QV2NvZ3ONkG36e4m7+KSNK4fUc='; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; worker-src 'none'; upgrade-insecure-requests"
+          "value": "default-src 'none'; script-src 'sha256-YC2Ff6G7FT4VFc+QnDyRhLsnvc2yhb8372JiVnnh5B8=' 'sha256-zVVMDKC6V4Pssi2QIaEE+BFFDyAZpSBDG8EdzH6qFK4=' 'sha256-MvkfRM2uVDtpRCwzNL3LRzCQPR6mma+EGexR/IfaULo='; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; worker-src 'none'; upgrade-insecure-requests"
         },
         {
           "key": "X-Content-Type-Options",
