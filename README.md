@@ -6,6 +6,8 @@
 
 [Open Flowkenstein](https://flowkenstein.com/en) · [Start drawing](https://flowkenstein.com/atelier-en)
 
+![Flowkenstein homepage with its BPMN workshop preview](public/flowkenstein-preview-en.png)
+
 ## Features
 
 - BPMN tasks, events, gateways, connections and sub-processes.

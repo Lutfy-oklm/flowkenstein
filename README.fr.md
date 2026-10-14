@@ -6,6 +6,8 @@ Tableau BPMN 2.0 gratuit et open source pour dessiner et relier les étapes d’
 
 **Site : https://flowkenstein.com** · **Tableau : https://flowkenstein.com/atelier**
 
+![Accueil Flowkenstein et aperçu de son atelier BPMN](public/flowkenstein-preview-fr.png)
+
 ## Organisation
 
 | Emplacement | Contenu |
