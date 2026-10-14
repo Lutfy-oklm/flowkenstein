@@ -4,6 +4,7 @@ const {text,pages}=JSON.parse(fs.readFileSync(path.join(root,'src/en.json'),'utf
 const names={'index.html':'en.html','atelier.html':'atelier-en.html','Processia.html':'atelier-en.html','aide.html':'help-en.html','contact.html':'contact-en.html','mentions-legales.html':'legal-notice-en.html','confidentialite.html':'privacy-en.html','conditions-utilisation.html':'terms-en.html'};
 const css=`.language-switch{display:inline-flex;align-items:center;gap:3px;white-space:nowrap;font:12px Arial,sans-serif}.language-switch a,.language-switch span{display:inline-block;padding:7px 8px;border-radius:7px;text-decoration:none;color:inherit}.language-switch a:hover{background:#e0eeea}.language-switch [aria-current=page]{background:#d7eeee;color:#006e74;font-weight:700}.file-menu .language-switch{display:flex;justify-content:flex-start;padding:4px 8px}.file-menu .language-switch a{font-size:12px;color:#142f49}.page-nav .language-switch{margin-left:auto}@media(max-width:600px){.language-switch a,.language-switch span{padding:6px}.navlinks{gap:9px!important}.page-nav{gap:10px!important}.page-nav img{width:140px!important}.page-nav>a:last-child{padding:8px!important}}`;
 function t(value){const s=value.trim();return text[s]===undefined?value:value.replace(s,text[s]);}
+const mobileEnglish='@media(max-width:600px){html[lang=en] .hero mark{white-space:normal;box-decoration-break:clone;-webkit-box-decoration-break:clone}}';
 function translateMarkup(html){
  return html.replace(/(<style\b[\s\S]*?<\/style>|<script\b[\s\S]*?<\/script>|<[^>]+>)|([^<]+)/gi,(all,tag,content)=>{
   if(content)return t(content);
@@ -20,7 +21,7 @@ function languageLinks(html,fr,lang){
  else html=html.replace(/(<nav class="page-nav"[^>]*><a[\s\S]*?<\/a>)/,'$1'+nav);
  const route=file=>file==='index.html'?'':file.replace(/\.html$/,'');
  const meta=`<link rel="alternate" hreflang="fr" href="https://flowkenstein.com/${route(fr)}"><link rel="alternate" hreflang="en" href="https://flowkenstein.com/${route(en)}"><link rel="alternate" hreflang="x-default" href="https://flowkenstein.com/${route(fr)}">`;
- return html.replace('</head>',`<style>${css}</style>${meta}</head>`);
+ return html.replace('</head>',`<style>${css}${mobileEnglish}</style>${meta}</head>`);
 }
 function englishEditor(source){
  let html=source.replace(/const frenchLabels=\{[\s\S]*?(?=function PreserveLaneHeight)/,`function frenchTranslate(template,replacements={}){return String(template).replace(/\\{([^}]+)\\}/g,(match,key)=>replacements[key]===undefined?match:String(replacements[key]));}\n`);
