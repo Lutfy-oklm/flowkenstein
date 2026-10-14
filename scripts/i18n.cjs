@@ -39,7 +39,12 @@ function englishEditor(source){
  html=html.replace(/<button id="undo"[^>]*>/,tag=>tag.replaceAll('="Cancel"','="Undo"'));
  return englishLinks(html);
 }
-function englishHome(source){return englishLinks(translateMarkup(source).replace('lang="fr"','lang="en"'));}
+function englishHome(source){
+ let html=translateMarkup(source).replace('lang="fr"','lang="en"');
+ // Emphasize the same meaning in both languages despite different word order.
+ html=html.replace('<span class="headline-line">Bring your <em>processes</em></span><span class="headline-line">to life.</span>','<span class="headline-line">Bring your processes</span><span class="headline-line">to <em>life</em>.</span>');
+ return englishLinks(html);
+}
 function englishPage(name,source){const page=pages[name];if(!page)throw Error('Missing English page: '+name);
  const main=`<main class="legal-main"><a class="back" href="index.html">← Back to home</a><h1>${page.title}</h1><p class="lead">${page.lead}</p><p class="updated">Last updated: 13 October 2026</p>${page.body}</main>`;
  let html=translateMarkup(source.replace(/<main\b[\s\S]*?<\/main>/,main)).replace('lang="fr"','lang="en"');
